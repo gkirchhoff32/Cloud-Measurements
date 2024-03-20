@@ -182,7 +182,7 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
 
     return torch.tensor(active_ratio_hst)
 
-def generate_fit_val_eval(data, data_ref, t_det_lst, n_shots, n_shots_ref):
+def generate_fit_val(data, t_det_lst, n_shots):
     """
     Generates fit, validation, and evaluation data sets for the fitting routine. For reference - (1) Fit set: Dataset
     used to generate the fit; (2) Validation set: Independent dataset used to calculate validation loss; and (3)
@@ -205,7 +205,7 @@ def generate_fit_val_eval(data, data_ref, t_det_lst, n_shots, n_shots_ref):
     split_value = int(len(data) // 2)
     t_phot_fit = data[:split_value]
     t_phot_val = data[split_value:]
-    t_phot_eval = data_ref[:]
+    # t_phot_eval = data_ref[:]
     split_value_det = int(len(t_det_lst) // 2)
     t_det_lst_fit = t_det_lst[:split_value_det]
     t_det_lst_val = t_det_lst[split_value_det:]
@@ -215,24 +215,24 @@ def generate_fit_val_eval(data, data_ref, t_det_lst, n_shots, n_shots_ref):
     ratio_val_split = len(t_phot_val) / len(data)
     n_shots_fit = np.floor(n_shots * ratio_fit_split).astype(int)
     n_shots_val = np.floor(n_shots * ratio_val_split).astype(int)
-    n_shots_eval = n_shots_ref
+    # n_shots_eval = n_shots_ref
 
     t_phot_fit_tnsr = torch.tensor(t_phot_fit.to_numpy())
     t_phot_val_tnsr = torch.tensor(t_phot_val.to_numpy())
-    t_phot_eval_tnsr = torch.tensor(t_phot_eval.to_numpy())
+    # t_phot_eval_tnsr = torch.tensor(t_phot_eval.to_numpy())
 
-    return t_phot_fit_tnsr, t_phot_val_tnsr, t_phot_eval_tnsr, t_det_lst_fit, t_det_lst_val, n_shots_fit, n_shots_val, n_shots_eval
+    return t_phot_fit_tnsr, t_phot_val_tnsr, t_det_lst_fit, t_det_lst_val, n_shots_fit, n_shots_val
 
 
 # Generate fit routine
-def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, t_phot_eval_tnsr, active_ratio_hst_fit,
-                active_ratio_hst_val, active_ratio_hst_ref, n_shots_fit, n_shots_val, n_shots_eval, learning_rate=1e-1,
+def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_ratio_hst_fit,
+                active_ratio_hst_val, n_shots_fit, n_shots_val, learning_rate=1e-1,
                 rel_step_lim=1e-8, intgrl_N=10000, max_epochs=4000, term_persist=20):
 
     t_min, t_max = t_fine[0], t_fine[-1]
 
     val_loss_arr = np.full(M_max+1, np.nan)
-    eval_loss_arr = np.zeros(M_max+1)
+    # eval_loss_arr = np.zeros(M_max+1)
     coeffs = np.zeros((M_max+1, M_max+1))
     fit_rate_fine = np.zeros((M_max+1, len(t_fine)))
     C_scale_arr = np.zeros(M_max+1)
@@ -263,10 +263,10 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, t_phot_
         start = time.time()
         t_fit_norm = fit_model.tstamp_condition(t_phot_fit_tnsr, t_min, t_max)
         t_val_norm = fit_model.tstamp_condition(t_phot_val_tnsr, t_min, t_max)
-        t_eval_norm = fit_model.tstamp_condition(t_phot_eval_tnsr, t_min, t_max)
+        # t_eval_norm = fit_model.tstamp_condition(t_phot_eval_tnsr, t_min, t_max)
         t_N_fit = np.max(t_phot_fit_tnsr.detach().numpy())
         t_N_val = np.max(t_phot_val_tnsr.detach().numpy())
-        t_N_eval = np.max(t_phot_eval_tnsr.detach().numpy())
+        # t_N_eval = np.max(t_phot_eval_tnsr.detach().numpy())
         t_intgrl = cheby_poly(torch.linspace(0, 1, intgrl_N), M)
         while rel_step > rel_step_lim and epoch < max_epochs:
             fit_model.train()
@@ -305,23 +305,23 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, t_phot_
         # Now use the generated fit and calculate loss against evaluation set (e.g., no deadtime, high-OD data)
         # When evaluating, I don't want to use the deadtime model as my evaluation metric. So I will use the Poisson loss function.
         # To accommodate, I will remove the active_ratio_hst_ref which is what incorporates the deadtime.
-        # pred_eval, integral_eval = fit_model(intgrl_N, active_ratio_hst_ref, t_eval_norm, t_N_eval, t_intgrl, cheby=True)
-        pred_eval, integral_eval = fit_model(intgrl_N, torch.ones(len(active_ratio_hst_ref)), t_eval_norm, t_N_eval, t_intgrl, cheby=True)
+
+        # pred_eval, integral_eval = fit_model(intgrl_N, torch.ones(len(active_ratio_hst_ref)), t_eval_norm, t_N_eval, t_intgrl, cheby=True)
 
         # If the number of shots between evaluation set and validation set differ, then arrival rate needs to be scaled accordingly.
         # Refer to Grant's notes for the derivation of this rescaling expression
-        n_det_eval = len(pred_eval)
-        C_scale = n_det_eval / n_shots_eval / integral_eval
-        loss_eval = loss_fn(C_scale * pred_eval, C_scale * integral_eval * torch.tensor(n_shots_eval))
-        eval_loss_arr[M] = loss_eval
-        C_scale_arr[M] = C_scale
+        # n_det_eval = len(pred_eval)
+        # C_scale = n_det_eval / n_shots_eval / integral_eval
+        # loss_eval = loss_fn(C_scale * pred_eval, C_scale * integral_eval * torch.tensor(n_shots_eval))
+        # eval_loss_arr[M] = loss_eval
+        # C_scale_arr[M] = C_scale
 
         end = time.time()
         print('Order={}: {:.2f} sec'.format(M, end - start))
 
         ax.plot(fit_loss_lst, label='Order {}'.format(M))
 
-    return ax, val_loss_arr, eval_loss_arr, fit_rate_fine, coeffs, C_scale_arr
+    return ax, val_loss_arr, fit_rate_fine, coeffs, C_scale_arr
 
 
 
