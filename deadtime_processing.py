@@ -50,7 +50,7 @@ repeat_run = False  # Set TRUE if repeating processing with same parameters but 
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
-window_bnd = np.array([975, 1100])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([950, 1200])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 # if use_sim:
 #     deadtime = 29.1e-9  # [s] simulated deadtime
@@ -67,8 +67,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 19
-M_max = 29
+M_min = 12
+M_max = 13
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -101,8 +101,9 @@ save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss output
 #     min_idx = np.where(OD_list == min(OD_list))[0][0]
 #     max_idx = np.where(OD_list == np.unique(OD_list)[-2])[0][0]
 
-fname = r'\simnum_3_nshot1.00E+03_useHGFalse.nc'
-sim_num = int(fname.split('_')[1])
+fname_LG = r'\simnum_3_nshot1.00E+03_useHGFalse.nc'
+fname_HG = r'\simnum_3_nshot1.00E+03_useHGTrue.nc'
+sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
 #     if use_sim:
@@ -159,16 +160,23 @@ if use_sim:
 # for k in np.arange(start_idx, stop_idx):
 # fname = r'/' + files[k]
 # Obtain the OD value from the file name. Follow the README guide to ascertain the file naming convention
-flight_time, n_shots, t_det_lst = dorg.data_organize(dt, load_dir, fname, window_bnd, max_lsr_num_fit, exclude_shots)
+flight_time_LG, n_shots, t_det_lst_LG = dorg.data_organize(dt, load_dir, fname_LG, window_bnd, max_lsr_num_fit, exclude_shots)
+flight_time_HG, _, t_det_lst_HG = dorg.data_organize(dt, load_dir, fname_HG, window_bnd, max_lsr_num_fit, exclude_shots)
+
+flight_time_LG = flight_time_LG.values
+flight_time_HG = flight_time_HG.values
+# flight_time_com = np.concatenate((flight_time_LG, flight_time_HG), axis=None)
+# t_det_lst_com = t_det_lst_LG + t_det_lst_HG
+
 # if use_sim:
 #     print('\n{}'.format(fname[1:15]))
 # else:
 #     print('\n{}:'.format(fname[1:5]))
-print('Number of detections: {}'.format(len(flight_time)))
+print('Number of detections: {}'.format(len(flight_time_LG)))
 print('Number of laser shots: {}'.format(n_shots))
 
 if use_sim:
-    ds = xr.open_dataset(load_dir + fname)
+    ds = xr.open_dataset(load_dir + fname_LG)
     # A = ds.target_amplitude.to_numpy()
     # sigma = ds.laser_pulse_width.to_numpy()
     # mu = ds.target_time.to_numpy()
@@ -178,8 +186,8 @@ if use_sim:
     # t_sim_bins = ds.t_sim_bins.to_numpy()
     og_t_fine = np.arange(0, 2000/c*2, dt)
     idx_min = np.argmin(abs(og_t_fine - t_min))
-    idx_max = np.argmin(abs(og_t_fine - t_max))
-    photon_rate_arr = photon_rate_arr[idx_min:idx_max+1]
+    # idx_max = np.argmin(abs(og_t_fine - t_max))
+    photon_rate_arr = photon_rate_arr[idx_min:idx_min+len(t_fine)]
 
     # fig = plt.figure()
     # plt.plot(t_fine*c/2, photon_rate_arr)
@@ -190,7 +198,7 @@ if use_sim:
 try:
     t_phot_fit_tnsr, t_phot_val_tnsr, \
     t_det_lst_fit, t_det_lst_val, n_shots_fit, \
-    n_shots_val, = fit.generate_fit_val(flight_time, t_det_lst, n_shots)
+    n_shots_val, = fit.generate_fit_val(flight_time_LG, t_det_lst_LG, n_shots)
 except:
     ZeroDivisionError
     print('ERROR: Insufficient laser shots... increase the "max_lsr_num_fit" parameter.')
@@ -251,12 +259,16 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    bin_avg = 1000
+    bin_avg = 500
     res = dt * bin_avg
     bin_array = set_binwidth(t_min, t_max, res)
-    n, bins = np.histogram(flight_time, bins=bin_array)
+    n, bins = np.histogram(flight_time_LG, bins=bin_array)
     binwidth = np.diff(bins)[0]
     N = n / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
+    # # try accomodating for combined high-gain and low-gain signals
+    # photon_rate_arr *= 10
+    # N /= 0.95
+    # fit_rate_seg /= 0.95
     center = 0.5 * (bins[:-1] + bins[1:])
     ax.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.5)
     ax.plot(t_fine*c/2, fit_rate_seg, 'r--')
@@ -272,7 +284,7 @@ if not repeat_run:
     plt.tight_layout()
 
 fit_rate_seg_lst.append(fit_rate_seg)
-flight_time_lst.append(flight_time)
+flight_time_lst.append(flight_time_LG)
 active_ratio_hst_lst.append(active_ratio_hst_fit)
 
 plt.show()

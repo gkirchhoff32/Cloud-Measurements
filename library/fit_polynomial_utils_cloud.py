@@ -78,28 +78,44 @@ class Fit_Pulse(torch.nn.Module):
         model_out = torch.exp(poly) + self.B  # Forward model
         plt.close()
 
-        # calculate the integral
-        t_poly_cheb = t_intgrl
-        poly = t_poly_cheb @ self.C
+        # # This is what you used to do for the deadtime experiments:
+        # # calculate the integral
+        # t_poly_cheb = t_intgrl
+        # poly = t_poly_cheb @ self.C
+        # fine_res_model = torch.exp(poly) + self.B
+        #
+        # t_fine, dt = np.linspace(self.t_min, self.t_max, intgrl_N, endpoint=False, retstep=True)
+        # t_max_idx = np.argmin(np.abs(t_fine-t_N))
+        # active_ratio_hst.resize_(fine_res_model.size())
+        # fine_res_model = fine_res_model * active_ratio_hst  # Generate deadtime noise model
+        # integral_out = self.riemann(fine_res_model, dt)
+
+        # This is the new likelihood function ingesting both low- and high-gain channels
+        poly = t_intgrl @ self.C
         fine_res_model = torch.exp(poly) + self.B
-
-        # dt = (self.t_max - self.t_min) / intgrl_N  # Step size
-        t_fine, dt = np.linspace(self.t_min, self.t_max, intgrl_N, endpoint=False, retstep=True)
-        t_max_idx = np.argmin(np.abs(t_fine-t_N))
-        # assert (len(fine_res_model) == len(active_ratio_hst))
+        t_fine, dt = np.linspace(self.t_min, self.t_max, intgrl_N+1, endpoint=True, retstep=True)
         active_ratio_hst.resize_(fine_res_model.size())
-        fine_res_model = fine_res_model * active_ratio_hst  # Generate deadtime noise model
-        # integral_out = self.riemann(fine_res_model[:t_max_idx], dt)  # Numerically integrate
-        integral_out = self.riemann(fine_res_model, dt)
 
-        return model_out, integral_out
+        Y, _ = np.histogram(t.detach().numpy(), bins=t_fine)
 
 
-def pois_loss(prof, integral):
+        return fine_res_model, active_ratio_hst, Y, dt
+
+
+def pois_loss(pred_fit, active_ratio_hst, dt, Y, Nshots):
     """
     Non-homogenous Poisson point process loss function
     """
-    return integral-torch.sum(torch.log(prof))
+    # return integral-torch.sum(torch.log(prof))\
+    # Y = torch.from_numpy(Y)
+
+    A = torch.tensor(Y)
+    B = torch.tensor(Y)*torch.log(pred_fit)
+    C
+
+    loss = torch.sum(Nshots*pred_fit*active_ratio_hst*dt - torch.tensor(Y)*torch.log(pred_fit))
+
+    return loss
 
 # Chebyshev polynomial matrix generator
 def cheby_poly(x, M):
@@ -217,8 +233,12 @@ def generate_fit_val(data, t_det_lst, n_shots):
     n_shots_val = np.floor(n_shots * ratio_val_split).astype(int)
     # n_shots_eval = n_shots_ref
 
-    t_phot_fit_tnsr = torch.tensor(t_phot_fit.to_numpy())
-    t_phot_val_tnsr = torch.tensor(t_phot_val.to_numpy())
+    if isinstance(t_phot_fit, np.ndarray):
+        t_phot_fit_tnsr = torch.tensor(t_phot_fit)
+        t_phot_val_tnsr = torch.tensor(t_phot_val)
+    else:
+        t_phot_fit_tnsr = torch.tensor(t_phot_fit.to_numpy())
+        t_phot_val_tnsr = torch.tensor(t_phot_val.to_numpy())
     # t_phot_eval_tnsr = torch.tensor(t_phot_eval.to_numpy())
 
     return t_phot_fit_tnsr, t_phot_val_tnsr, t_det_lst_fit, t_det_lst_val, n_shots_fit, n_shots_val
@@ -263,15 +283,14 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         start = time.time()
         t_fit_norm = fit_model.tstamp_condition(t_phot_fit_tnsr, t_min, t_max)
         t_val_norm = fit_model.tstamp_condition(t_phot_val_tnsr, t_min, t_max)
-        # t_eval_norm = fit_model.tstamp_condition(t_phot_eval_tnsr, t_min, t_max)
         t_N_fit = np.max(t_phot_fit_tnsr.detach().numpy())
         t_N_val = np.max(t_phot_val_tnsr.detach().numpy())
-        # t_N_eval = np.max(t_phot_eval_tnsr.detach().numpy())
         t_intgrl = cheby_poly(torch.linspace(0, 1, intgrl_N), M)
         while rel_step > rel_step_lim and epoch < max_epochs:
             fit_model.train()
-            pred_fit, integral_fit = fit_model(intgrl_N, active_ratio_hst_fit, t_fit_norm, t_N_fit, t_intgrl, cheby=True)
-            loss_fit = loss_fn(pred_fit, integral_fit * n_shots_fit)  # add regularization here
+            # pred_fit, integral_fit = fit_model(intgrl_N, active_ratio_hst_fit, t_fit_norm, t_N_fit, t_intgrl, cheby=True)
+            pred_fit, active_ratio_hst_fit, Y, dt = fit_model(intgrl_N, active_ratio_hst_fit, t_phot_fit_tnsr, t_N_fit, t_intgrl, cheby=False)
+            loss_fit = loss_fn(pred_fit, active_ratio_hst_fit, dt, Y, n_shots_fit)  # add regularization here
             fit_loss_lst += [loss_fit.item()]
 
             # calculate relative step as an average over the last term_persist iterations
