@@ -67,8 +67,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 22
-M_max = 24
+M_min = 12
+M_max = 14
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -101,7 +101,7 @@ save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss output
 #     min_idx = np.where(OD_list == min(OD_list))[0][0]
 #     max_idx = np.where(OD_list == np.unique(OD_list)[-2])[0][0]
 
-fname = r'\simnum_2_nshot1.00E+03_useHGTrue.nc'
+fname = r'\simnum_3_nshot1.00E+03_useHGFalse.nc'
 sim_num = int(fname.split('_')[1])
 
 # if run_full and use_final_idx:
