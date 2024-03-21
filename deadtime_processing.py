@@ -50,7 +50,7 @@ repeat_run = False  # Set TRUE if repeating processing with same parameters but 
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
-window_bnd = np.array([850, 1150])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1100])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 # if use_sim:
 #     deadtime = 29.1e-9  # [s] simulated deadtime
@@ -67,8 +67,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 12
-M_max = 14
+M_min = 19
+M_max = 29
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
