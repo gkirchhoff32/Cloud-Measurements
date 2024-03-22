@@ -50,7 +50,7 @@ repeat_run = False  # Set TRUE if repeating processing with same parameters but 
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
-window_bnd = np.array([950, 1200])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([850, 1200])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 # if use_sim:
 #     deadtime = 29.1e-9  # [s] simulated deadtime
@@ -67,8 +67,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 12
-M_max = 13
+M_min = 4
+M_max = 5
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -150,7 +150,8 @@ bin_edges = np.linspace(t_min, t_max, intgrl_N+1, endpoint=False)
 val_final_loss_lst = []
 eval_final_loss_lst = []
 C_scale_final = []
-percent_active_lst = []
+percent_active_LG_lst = []
+percent_active_HG_lst = []
 fit_rate_seg_lst = []
 flight_time_lst = []
 active_ratio_hst_lst = []
@@ -196,9 +197,13 @@ if use_sim:
     # true_rho_lst.append(A * np.exp(-1 * (t_fine - mu) ** 2 / 2 / sigma ** 2) + bkg)
 
 try:
-    t_phot_fit_tnsr, t_phot_val_tnsr, \
-    t_det_lst_fit, t_det_lst_val, n_shots_fit, \
-    n_shots_val, = fit.generate_fit_val(flight_time_LG, t_det_lst_LG, n_shots)
+    t_phot_fit_tnsr_LG, t_phot_val_tnsr_LG, \
+    t_det_lst_fit_LG, t_det_lst_val_LG, n_shots_fit_LG, \
+    n_shots_val_LG = fit.generate_fit_val(flight_time_LG, t_det_lst_LG, n_shots)
+
+    t_phot_fit_tnsr_HG, t_phot_val_tnsr_HG, \
+    t_det_lst_fit_HG, t_det_lst_val_HG, n_shots_fit_HG, \
+    n_shots_val_HG = fit.generate_fit_val(flight_time_HG, t_det_lst_HG, n_shots)
 except:
     ZeroDivisionError
     print('ERROR: Insufficient laser shots... increase the "max_lsr_num_fit" parameter.')
@@ -206,13 +211,30 @@ except:
 
 # Generate "active-ratio histogram" that adjusts the histogram proportionally according to how many bins the detector was "active vs dead"
 if not include_deadtime:
-    active_ratio_hst_fit = torch.ones(len(bin_edges)-1)
-    active_ratio_hst_val = torch.ones(len(bin_edges)-1)
+    active_ratio_hst_fit_LG = torch.ones(len(bin_edges)-1)
+    active_ratio_hst_val_LG = torch.ones(len(bin_edges)-1)
+
+    active_ratio_hst_fit_HG = torch.ones(len(bin_edges) - 1)
+    active_ratio_hst_val_HG = torch.ones(len(bin_edges) - 1)
 else:
-    active_ratio_hst_fit = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit, n_shots_fit)
-    active_ratio_hst_val = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val, n_shots_val)
-percent_active = torch.sum(active_ratio_hst_fit).item()/len(active_ratio_hst_fit)
-percent_active_lst.append(percent_active)
+    active_ratio_hst_fit_LG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_LG, n_shots_fit_LG)
+    active_ratio_hst_val_LG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_LG, n_shots_val_LG)
+
+    active_ratio_hst_fit_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_HG,
+                                                      n_shots_fit_HG)
+    active_ratio_hst_val_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_HG,
+                                                      n_shots_val_HG)
+percent_active_LG = torch.sum(active_ratio_hst_fit_LG).item()/len(active_ratio_hst_fit_LG)
+percent_active_LG_lst.append(percent_active_LG)
+percent_active_HG = torch.sum(active_ratio_hst_fit_HG).item()/len(active_ratio_hst_fit_HG)
+percent_active_HG_lst.append(percent_active_HG)
+
+t_phot_fit_tnsr = [t_phot_fit_tnsr_LG, t_phot_fit_tnsr_HG]
+t_phot_val_tnsr = [t_phot_val_tnsr_LG, t_phot_val_tnsr_HG]
+active_ratio_hst_fit = [active_ratio_hst_fit_LG, active_ratio_hst_fit_HG]
+active_ratio_hst_val = [active_ratio_hst_val_LG, active_ratio_hst_val_HG]
+n_shots_fit = [n_shots_fit_LG, n_shots_fit_HG]
+n_shots_val = [n_shots_val_LG, n_shots_val_HG]
 
 # Run fit optimizer
 ax, val_loss_arr, \
@@ -265,9 +287,9 @@ if not repeat_run:
     n, bins = np.histogram(flight_time_LG, bins=bin_array)
     binwidth = np.diff(bins)[0]
     N = n / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
-    # # try accomodating for combined high-gain and low-gain signals
-    # photon_rate_arr *= 10
-    # N /= 0.95
+    # try accomodating for combined high-gain and low-gain signals
+    photon_rate_arr *= 20
+    N *= 20
     # fit_rate_seg /= 0.95
     center = 0.5 * (bins[:-1] + bins[1:])
     ax.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.5)
