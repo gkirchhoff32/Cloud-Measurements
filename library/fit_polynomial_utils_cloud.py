@@ -90,17 +90,16 @@ class Fit_Pulse(torch.nn.Module):
         # fine_res_model = fine_res_model * active_ratio_hst  # Generate deadtime noise model
         # integral_out = self.riemann(fine_res_model, dt)
 
-        # This is the new likelihood function ingesting both low- and high-gain channels
         poly = t_intgrl @ self.C
         fine_res_model = torch.exp(poly) + self.B
         fine_res_model = torch.reshape(fine_res_model, active_ratio_hst.size())
         t_fine, dt = np.linspace(self.t_min, self.t_max, intgrl_N+1, endpoint=True, retstep=True)
         # active_ratio_hst = torch.reshape(active_ratio_hst, fine_res_model.size())
 
-        return fine_res_model, active_ratio_hst, dt
+        return fine_res_model, dt
 
 
-def pois_loss(pred_fit, active_ratio_hst, dt, Y, Nshots):
+def pois_loss(pred_fit, eta, active_ratio_hst, dt, Y, Nshots):
     """
     Non-homogenous Poisson point process loss function
     """
@@ -111,7 +110,9 @@ def pois_loss(pred_fit, active_ratio_hst, dt, Y, Nshots):
     # active_ratio_hst = active_ratio_hst.detach().numpy()
 
     # Y = torch.reshape(Y, pred_fit.size())
-    loss = torch.sum(Nshots*pred_fit*active_ratio_hst*dt - Y*torch.log(pred_fit))
+    test_out = Y * torch.log(eta*pred_fit)
+    loss = torch.sum(Nshots*eta*pred_fit*active_ratio_hst*dt - Y*torch.log(eta*pred_fit))
+    # loss = torch.sum(Nshots*pred_fit*active_ratio_hst*dt - torch.log(pred_fit))
 
     return loss
 
@@ -302,12 +303,16 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         while rel_step > rel_step_lim and epoch < max_epochs:
             fit_model.train()
             # pred_fit, integral_fit = fit_model(intgrl_N, active_ratio_hst_fit, t_fit_norm, t_N_fit, t_intgrl, cheby=True)
-            fine_res_model, active_ratio_hst_fit_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, cheby=True)
-            fine_res_model, active_ratio_hst_fit_HG, dt = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
-            pred_fit_LG = 0.05 * fine_res_model
-            pred_fit_HG = 0.85 * fine_res_model
-            loss_fit_LG = loss_fn(pred_fit_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
-            loss_fit_HG = loss_fn(pred_fit_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
+            fine_res_model_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, cheby=True)
+            fine_res_model_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
+            # pred_fit_LG = fine_res_model_LG  # [Hz]
+            # pred_fit_HG = fine_res_model_HG  # [Hz]
+            eta_LG = 0.05
+            eta_HG = 0.95
+            # pred_fit_LG = fine_res_model_LG / 0.05
+            # pred_fit_HG = fine_res_model_HG / 0.85
+            loss_fit_LG = loss_fn(fine_res_model_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
+            loss_fit_HG = loss_fn(fine_res_model_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
             loss_fit = loss_fit_LG + loss_fit_HG
             fit_loss_lst += [loss_fit.item()]
 
@@ -330,16 +335,18 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
 
         print(epoch)
         t_fine_tensor = torch.tensor(t_fine)
-        pred_mod_seg, __, __ = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fine_tensor, t_intgrl, cheby=False)
+        pred_mod_seg, __ = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fine_tensor, t_intgrl, cheby=False)
         fit_rate_fine[M, :] = pred_mod_seg.detach().numpy().T
         coeffs[M, 0:M + 1] = fit_model.C.detach().numpy().T
 
         # Calculate validation loss
         # Using fit generated from fit set, calculate loss when applied to validation set
-        pred_val_LG, active_ratio_hst_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, cheby=True)
-        pred_val_HG, active_ratio_hst_val_HG, dt = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, cheby=True)
-        loss_val_LG = loss_fn(pred_val_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
-        loss_val_HG = loss_fn(pred_val_HG, active_ratio_hst_val_HG, dt, Y_val_HG, n_shots_val_HG)  # add regularization here
+        pred_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, cheby=True)
+        pred_val_HG, __ = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, cheby=True)
+        # pred_val_LG *= 0.05
+        # pred_val_HG *= 0.95
+        loss_val_LG = loss_fn(pred_val_LG, eta_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
+        loss_val_HG = loss_fn(pred_val_HG, eta_HG, active_ratio_hst_val_HG, dt, Y_val_HG, n_shots_val_HG)  # add regularization here
         val_loss_arr[M] = loss_val_LG + loss_val_HG
 
         # Now use the generated fit and calculate loss against evaluation set (e.g., no deadtime, high-OD data)

@@ -39,7 +39,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
 # max_lsr_num_ref = int(9.999e6)  # Maximum number of laser shots for the reference dataset
-max_lsr_num_fit = int(999)
+max_lsr_num_fit = int(699)  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -50,7 +50,7 @@ repeat_run = False  # Set TRUE if repeating processing with same parameters but 
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
-window_bnd = np.array([850, 1200])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 # if use_sim:
 #     deadtime = 29.1e-9  # [s] simulated deadtime
@@ -67,8 +67,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 4
-M_max = 5
+M_min = 15
+M_max = 16
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -173,22 +173,25 @@ flight_time_HG = flight_time_HG.values
 #     print('\n{}'.format(fname[1:15]))
 # else:
 #     print('\n{}:'.format(fname[1:5]))
-print('Number of detections: {}'.format(len(flight_time_LG)))
+num_det_LG = len(flight_time_LG)
+num_det_HG = len(flight_time_HG)
+print('Number of detections low gain: {}'.format(len(flight_time_LG)))
+print('Number of detections high gain: {}'.format(len(flight_time_HG)))
 print('Number of laser shots: {}'.format(n_shots))
 
 if use_sim:
-    ds = xr.open_dataset(load_dir + fname_LG)
+    ds_LG = xr.open_dataset(load_dir + fname_LG)
     # A = ds.target_amplitude.to_numpy()
     # sigma = ds.laser_pulse_width.to_numpy()
     # mu = ds.target_time.to_numpy()
     # bkg = ds.background.to_numpy()
 
-    photon_rate_arr = ds.photon_rate_arr.to_numpy()
+    photon_rate_arr_LG = ds_LG.photon_rate_arr.to_numpy()
     # t_sim_bins = ds.t_sim_bins.to_numpy()
     og_t_fine = np.arange(0, 2000/c*2, dt)
     idx_min = np.argmin(abs(og_t_fine - t_min))
     # idx_max = np.argmin(abs(og_t_fine - t_max))
-    photon_rate_arr = photon_rate_arr[idx_min:idx_min+len(t_fine)]
+    photon_rate_arr_LG = photon_rate_arr_LG[idx_min:idx_min+len(t_fine)]
 
     # fig = plt.figure()
     # plt.plot(t_fine*c/2, photon_rate_arr)
@@ -220,10 +223,8 @@ else:
     active_ratio_hst_fit_LG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_LG, n_shots_fit_LG)
     active_ratio_hst_val_LG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_LG, n_shots_val_LG)
 
-    active_ratio_hst_fit_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_HG,
-                                                      n_shots_fit_HG)
-    active_ratio_hst_val_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_HG,
-                                                      n_shots_val_HG)
+    active_ratio_hst_fit_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_HG, n_shots_fit_HG)
+    active_ratio_hst_val_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_HG, n_shots_val_HG)
 percent_active_LG = torch.sum(active_ratio_hst_fit_LG).item()/len(active_ratio_hst_fit_LG)
 percent_active_LG_lst.append(percent_active_LG)
 percent_active_HG = torch.sum(active_ratio_hst_fit_HG).item()/len(active_ratio_hst_fit_HG)
@@ -284,12 +285,12 @@ if not repeat_run:
     bin_avg = 500
     res = dt * bin_avg
     bin_array = set_binwidth(t_min, t_max, res)
-    n, bins = np.histogram(flight_time_LG, bins=bin_array)
+    n_LG, bins = np.histogram(flight_time_LG, bins=bin_array)
     binwidth = np.diff(bins)[0]
-    N = n / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
+    N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
     # try accomodating for combined high-gain and low-gain signals
-    photon_rate_arr *= 20
-    N *= 20
+    photon_rate_arr = photon_rate_arr_LG / 0.05
+    N = N_LG / 0.05
     # fit_rate_seg /= 0.95
     center = 0.5 * (bins[:-1] + bins[1:])
     ax.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.5)
