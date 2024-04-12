@@ -39,7 +39,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
 # max_lsr_num_ref = int(9.999e6)  # Maximum number of laser shots for the reference dataset
-max_lsr_num_fit = int(699)  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 199  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -50,7 +50,7 @@ repeat_run = False  # Set TRUE if repeating processing with same parameters but 
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
-window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1030])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 # if use_sim:
 #     deadtime = 29.1e-9  # [s] simulated deadtime
@@ -67,8 +67,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 15
-M_max = 16
+M_min = 11
+M_max = 20
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -101,8 +101,8 @@ save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss output
 #     min_idx = np.where(OD_list == min(OD_list))[0][0]
 #     max_idx = np.where(OD_list == np.unique(OD_list)[-2])[0][0]
 
-fname_LG = r'\simnum_3_nshot1.00E+03_useHGFalse.nc'
-fname_HG = r'\simnum_3_nshot1.00E+03_useHGTrue.nc'
+fname_LG = r'\simnum_4_nshot1.00E+03_useHGFalse.nc'
+fname_HG = r'\simnum_4_nshot1.00E+03_useHGTrue.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -162,7 +162,7 @@ if use_sim:
 # fname = r'/' + files[k]
 # Obtain the OD value from the file name. Follow the README guide to ascertain the file naming convention
 flight_time_LG, n_shots, t_det_lst_LG = dorg.data_organize(dt, load_dir, fname_LG, window_bnd, max_lsr_num_fit, exclude_shots)
-flight_time_HG, _, t_det_lst_HG = dorg.data_organize(dt, load_dir, fname_HG, window_bnd, max_lsr_num_fit, exclude_shots)
+flight_time_HG, __, t_det_lst_HG = dorg.data_organize(dt, load_dir, fname_HG, window_bnd, max_lsr_num_fit, exclude_shots)
 
 flight_time_LG = flight_time_LG.values
 flight_time_HG = flight_time_HG.values
@@ -214,8 +214,8 @@ except:
 
 # Generate "active-ratio histogram" that adjusts the histogram proportionally according to how many bins the detector was "active vs dead"
 if not include_deadtime:
-    active_ratio_hst_fit_LG = torch.ones(len(bin_edges)-1)
-    active_ratio_hst_val_LG = torch.ones(len(bin_edges)-1)
+    active_ratio_hst_fit_LG = torch.ones(len(bin_edges) - 1)
+    active_ratio_hst_val_LG = torch.ones(len(bin_edges) - 1)
 
     active_ratio_hst_fit_HG = torch.ones(len(bin_edges) - 1)
     active_ratio_hst_val_HG = torch.ones(len(bin_edges) - 1)
@@ -282,15 +282,15 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    bin_avg = 500
+    bin_avg = 100
     res = dt * bin_avg
     bin_array = set_binwidth(t_min, t_max, res)
     n_LG, bins = np.histogram(flight_time_LG, bins=bin_array)
     binwidth = np.diff(bins)[0]
     N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
     # try accomodating for combined high-gain and low-gain signals
-    photon_rate_arr = photon_rate_arr_LG / 0.05
-    N = N_LG / 0.05
+    photon_rate_arr = photon_rate_arr_LG / 0.022
+    N = N_LG / 0.022
     # fit_rate_seg /= 0.95
     center = 0.5 * (bins[:-1] + bins[1:])
     ax.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.5)
