@@ -112,7 +112,7 @@ def pois_loss(pred_fit, eta, active_ratio_hst, dt, Y, Nshots):
     # Y = torch.reshape(Y, pred_fit.size())
     # test_out = Y * torch.log(eta*pred_fit)
     loss = torch.sum(Nshots*eta*pred_fit*active_ratio_hst*dt - Y*torch.log(eta*pred_fit))
-    # loss = torch.sum(Nshots*pred_fit*active_ratio_hst*dt - torch.log(pred_fit))
+    # loss = -np.log(eta) + torch.sum(Nshots*pred_fit*active_ratio_hst*dt - Y*torch.log(pred_fit))
 
     return loss
 
@@ -307,11 +307,14 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
             fine_res_model_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
             # pred_fit_LG = fine_res_model_LG  # [Hz]
             # pred_fit_HG = fine_res_model_HG  # [Hz]
-            eta_LG = 0.022356960252165003
-            eta_HG = 0.424782244791135
+            eta_LG = 0.05
+            eta_HG = 0.95
+            # eta_LG = 0.022356960252165003
+            # eta_HG = 0.424782244791135
             loss_fit_LG = loss_fn(fine_res_model_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
             loss_fit_HG = loss_fn(fine_res_model_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
             loss_fit = loss_fit_LG + loss_fit_HG
+            # loss_fit = loss_fit_HG
             fit_loss_lst += [loss_fit.item()]
 
             # calculate relative step as an average over the last term_persist iterations

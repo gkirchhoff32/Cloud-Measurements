@@ -31,7 +31,7 @@ load_netcdf = True  # Set TRUE if loading from netcdf file ('*.ARSENL.nc'). Set 
 use_donovan = False  # Set TRUE if user wants to scale the histogram by using the Donovan correction
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set temporal boundaries for binning
-window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1100])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 dt = 25e-12  # [s] Resolution
 deadtime = 29.1e-9  # [s] Deadtime interval (25ns for sim, 29.1ns for SPCM)
@@ -42,7 +42,7 @@ t_max = window_bnd[1]
 if load_netcdf:
     home = str(Path.home())
     data_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\saved_sims'
-    fname = r'\\simnum_3_nshot1.00E+03_useHGFalse.nc'
+    fname = r'\\simnum_5_nshot5.00E+02_useHGTrue.nc'
 
     ds = xr.open_dataset(data_dir + fname)
 
@@ -81,7 +81,7 @@ else:
 ### Histogram of time of flight ###
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
-bin_avg = 500
+bin_avg = 50
 res = dt * bin_avg
 bin_array = set_binwidth(t_min, t_max, res)
 # bin_array = set_binwidth(t_min, t_max, dt)
@@ -89,6 +89,7 @@ n, bins = np.histogram(flight_time, bins=bin_array)
 print('Histogram plot time elapsed: {:.3} sec'.format(time.time() - start))
 binwidth = np.diff(bins)[0]
 N = n / binwidth / n_shots
+print(n_shots)
 if use_donovan:
     N_dono = N / (1 - N*deadtime)
 center = 0.5 * (bins[:-1]+bins[1:])

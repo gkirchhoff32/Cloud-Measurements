@@ -50,7 +50,7 @@ repeat_run = False  # Set TRUE if repeating processing with same parameters but 
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
-window_bnd = np.array([975, 1030])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 # if use_sim:
 #     deadtime = 29.1e-9  # [s] simulated deadtime
@@ -68,7 +68,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 20
+M_max = 25
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -81,28 +81,8 @@ load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\S
 save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 # fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
 
-# # Generate list of ODs used in the file directory
-# if use_sim:
-#     rho_ref = float(fname_ref[8:15])
-# else:
-#     OD_ref = int(fname_ref[3:5]) / 10
-# files = os.listdir(load_dir)
-# if use_sim:
-#     rho_list = np.zeros(len(files))
-#     for i in range(len(files)):
-#         rho_val = float(files[i][7:14])
-#         rho_list[i] = rho_val
-#     min_idx = np.where(rho_list == min(rho_list))[0][0]
-#     max_idx = np.where(rho_list == max(rho_list))[0][0]
-# else:
-#     OD_list = np.zeros(len(files))
-#     for i in range(len(files)):
-#         OD_list[i] = float(files[i][2:4]) / 10
-#     min_idx = np.where(OD_list == min(OD_list))[0][0]
-#     max_idx = np.where(OD_list == np.unique(OD_list)[-2])[0][0]
-
-fname_LG = r'\simnum_4_nshot1.00E+03_useHGFalse.nc'
-fname_HG = r'\simnum_4_nshot1.00E+03_useHGTrue.nc'
+fname_LG = r'\simnum_5_nshot5.00E+02_useHGFalse.nc'
+fname_HG = r'\simnum_5_nshot5.00E+02_useHGTrue.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -282,28 +262,47 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    bin_avg = 100
+    bin_avg = 400
     res = dt * bin_avg
     bin_array = set_binwidth(t_min, t_max, res)
     n_LG, bins = np.histogram(flight_time_LG, bins=bin_array)
+    n_HG, __ = np.histogram(flight_time_HG, bins=bin_array)
     binwidth = np.diff(bins)[0]
     N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
+    N_HG = n_HG / binwidth / n_shots  # [Hz]
     # try accomodating for combined high-gain and low-gain signals
     photon_rate_arr = photon_rate_arr_LG / 0.022
-    N = N_LG / 0.022
-    # fit_rate_seg /= 0.95
     center = 0.5 * (bins[:-1] + bins[1:])
-    ax.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.5)
-    ax.plot(t_fine*c/2, fit_rate_seg, 'r--')
-    ax.plot(t_fine*c/2, photon_rate_arr, 'k--')
+    ax.bar(center*c/2, N_HG/1e6, align='center', width=binwidth*c/2, color='b', alpha=0.5, label='High gain counts')
+    ax.bar(center*c/2, N_LG/1e6, align='center', width=binwidth*c/2, color='b', alpha=0.5, label='Low gain counts')
+    ax.bar(center*c/2, N_LG/1e6/0.02235, align='center', width=binwidth*c/2, color='r', alpha=0.5, label='Low gain counts (scaled)')
+    ax.plot(t_fine*c/2, fit_rate_seg/1e6, color='r', linestyle='--', label='Fit')
+    ax.plot(t_fine*c/2, photon_rate_arr/1e6, color='k', linestyle='--', label='Truth')
     ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
     # ax.set_title('Arrival Rate Fit: {}{:.2E}'.format('True Rho = ' if use_sim else 'OD = ', rho_list[k] if use_sim else +OD_list[k]))
     ax.set_xlabel('Range [m]')
-    ax.set_ylabel('Photon Arrival Rate [Hz]')
+    ax.set_ylabel('Photon Arrival Rate [MHz]')
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
     ax.text(0.1, 0.90, 'Polynomial order: {}'.format(min_order), transform=ax.transAxes, fontsize=14,
             verticalalignment='top', bbox=props)
     ax.semilogy()
+    plt.legend()
+    plt.tight_layout()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+
+    ax.plot(t_fine[int(bin_avg/2)::bin_avg] * c / 2, np.abs(photon_rate_arr[int(bin_avg/2)::bin_avg] - N_LG / 0.05), color='b', linestyle='--', label='Scaled LG error')
+    ax.plot(t_fine * c / 2, np.abs(photon_rate_arr - fit_rate_seg), color='r', linestyle='--', label='Fit error')
+    ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
+    ax.set_xlabel('Range [m]')
+    ax.set_ylabel('Absolute Error [Hz]')
+    ax.tick_params(axis='y', which='minor')
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    ax.text(0.1, 0.90, 'Polynomial order: {}'.format(min_order), transform=ax.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
+    ax.semilogy()
+    plt.legend()
     plt.tight_layout()
 
 fit_rate_seg_lst.append(fit_rate_seg)
