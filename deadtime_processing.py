@@ -38,8 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-# max_lsr_num_ref = int(9.999e6)  # Maximum number of laser shots for the reference dataset
-max_lsr_num_fit = 199  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 99  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -49,13 +48,8 @@ use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
-# window_bnd = [32e-9, 38e-9]  # [s] Set boundaries for binning to exclude outliers
 window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
-# if use_sim:
-#     deadtime = 29.1e-9  # [s] simulated deadtime
-# else:
-#     deadtime = 29.1e-9  # [s] Acquisition deadtime (25ns for PicoQuant boards, 29.1ns for Excelitas SPCM)
 deadtime = 29.1e-9  # [s]
 dt = 25e-12  # [s] TCSPC resolution
 
@@ -68,7 +62,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 25
+M_max = 22
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -81,8 +75,8 @@ load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\S
 save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 # fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
 
-fname_LG = r'\simnum_5_nshot5.00E+02_useHGFalse.nc'
-fname_HG = r'\simnum_5_nshot5.00E+02_useHGTrue.nc'
+fname_LG = r'\simnum_4_nshot1.00E+03_useHGFalse.nc'
+fname_HG = r'\simnum_4_nshot1.00E+03_useHGTrue.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -108,22 +102,9 @@ t_fine = np.arange(t_min, t_max, dt)  # [s]
 
 intgrl_N = len(t_fine)
 
-# flight_time_ref, n_shots_ref, t_det_lst_ref = dorg.data_organize(dt, load_dir, fname_ref, window_bnd, max_lsr_num_ref,
-#                                                                  exclude_shots)
-# if use_sim:
-#     print('\n{}'.format(fname_ref[1:15]))
-# else:
-#     print('\n{}:'.format(fname_ref[1:5]))
-# print('Number of detections (reference): {}'.format(len(flight_time_ref)))
-# print('Number of laser shots (reference): {}'.format(n_shots_ref))
-
 # Generate "active-ratio histogram" that adjusts the histogram proportionally according to how many bins the detector
 # was "active vs dead"
 bin_edges = np.linspace(t_min, t_max, intgrl_N+1, endpoint=False)
-# if not include_deadtime:
-#     active_ratio_hst_ref = torch.ones(len(bin_edges)-1)
-# else:
-#     active_ratio_hst_ref = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_ref, n_shots_ref)
 
 # Fitting routine
 # for j in range(len(repeat_range)):
@@ -133,13 +114,10 @@ C_scale_final = []
 percent_active_LG_lst = []
 percent_active_HG_lst = []
 fit_rate_seg_lst = []
-flight_time_lst = []
+flight_time_lst_LG = []
+flight_time_lst_HG = []
 active_ratio_hst_lst = []
-if use_sim:
-    true_rho_lst = []
 
-# for k in np.arange(start_idx, stop_idx):
-# fname = r'/' + files[k]
 # Obtain the OD value from the file name. Follow the README guide to ascertain the file naming convention
 flight_time_LG, n_shots, t_det_lst_LG = dorg.data_organize(dt, load_dir, fname_LG, window_bnd, max_lsr_num_fit, exclude_shots)
 flight_time_HG, __, t_det_lst_HG = dorg.data_organize(dt, load_dir, fname_HG, window_bnd, max_lsr_num_fit, exclude_shots)
@@ -149,10 +127,6 @@ flight_time_HG = flight_time_HG.values
 # flight_time_com = np.concatenate((flight_time_LG, flight_time_HG), axis=None)
 # t_det_lst_com = t_det_lst_LG + t_det_lst_HG
 
-# if use_sim:
-#     print('\n{}'.format(fname[1:15]))
-# else:
-#     print('\n{}:'.format(fname[1:5]))
 num_det_LG = len(flight_time_LG)
 num_det_HG = len(flight_time_HG)
 print('Number of detections low gain: {}'.format(len(flight_time_LG)))
@@ -161,23 +135,11 @@ print('Number of laser shots: {}'.format(n_shots))
 
 if use_sim:
     ds_LG = xr.open_dataset(load_dir + fname_LG)
-    # A = ds.target_amplitude.to_numpy()
-    # sigma = ds.laser_pulse_width.to_numpy()
-    # mu = ds.target_time.to_numpy()
-    # bkg = ds.background.to_numpy()
 
     photon_rate_arr_LG = ds_LG.photon_rate_arr.to_numpy()
-    # t_sim_bins = ds.t_sim_bins.to_numpy()
     og_t_fine = np.arange(0, 2000/c*2, dt)
     idx_min = np.argmin(abs(og_t_fine - t_min))
-    # idx_max = np.argmin(abs(og_t_fine - t_max))
     photon_rate_arr_LG = photon_rate_arr_LG[idx_min:idx_min+len(t_fine)]
-
-    # fig = plt.figure()
-    # plt.plot(t_fine*c/2, photon_rate_arr)
-    # plt.show()
-
-    # true_rho_lst.append(A * np.exp(-1 * (t_fine - mu) ** 2 / 2 / sigma ** 2) + bkg)
 
 try:
     t_phot_fit_tnsr_LG, t_phot_val_tnsr_LG, \
@@ -227,7 +189,6 @@ C_scale_arr = fit.optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val
 
 ax.set_ylabel('Loss')
 ax.set_xlabel('Iterations')
-# ax.set_title('{}{:.2E}'.format('True Rho = ' if use_sim else 'OD = ', rho_list[k] if use_sim else +OD_list[k]))
 ax.set_title('Simulation Number {}'.format(sim_num))
 plt.suptitle('Fit loss')
 plt.tight_layout()
@@ -236,10 +197,6 @@ ax.legend()
 print('Validation loss for\n')
 for i in range(len(M_lst)):
     print('Order {}: {:.5f}'.format(M_lst[i], val_loss_arr[M_lst[i]]))
-
-# print('Evaluation loss for\n')
-# for i in range(len(M_lst)):
-#     print('Order {}: {:.5f}'.format(M_lst[i], eval_loss_arr[M_lst[i]]))
 
 # Choose order to investigate
 minx, miny = np.nanargmin(val_loss_arr), np.nanmin(val_loss_arr)
@@ -252,7 +209,6 @@ except:
     print("\nERROR: Order exceeds maximum complexity iteration value.\n")
 
 val_final_loss_lst.append(val_loss_arr[min_order])
-# eval_final_loss_lst.append(eval_loss_arr[min_order])
 C_scale_final.append(C_scale_arr[min_order])
 
 # Arrival rate fit
@@ -262,8 +218,10 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    bin_avg = 400
-    res = dt * bin_avg
+    res_ideal = 2  # [m]
+    res = (res_ideal/c*2 // dt) * dt  # [s]
+    bin_avg = int(res / dt)
+    print('Figure Resolution: {} m'.format(res*c/2))
     bin_array = set_binwidth(t_min, t_max, res)
     n_LG, bins = np.histogram(flight_time_LG, bins=bin_array)
     n_HG, __ = np.histogram(flight_time_HG, bins=bin_array)
@@ -271,13 +229,33 @@ if not repeat_run:
     N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
     N_HG = n_HG / binwidth / n_shots  # [Hz]
     # try accomodating for combined high-gain and low-gain signals
-    photon_rate_arr = photon_rate_arr_LG / 0.022
+    photon_rate_arr_tot_eta = photon_rate_arr_LG / 0.022
+    photon_rate_arr_BS_eta = photon_rate_arr_LG / 0.05
     center = 0.5 * (bins[:-1] + bins[1:])
-    ax.bar(center*c/2, N_HG/1e6, align='center', width=binwidth*c/2, color='b', alpha=0.5, label='High gain counts')
-    ax.bar(center*c/2, N_LG/1e6, align='center', width=binwidth*c/2, color='b', alpha=0.5, label='Low gain counts')
-    ax.bar(center*c/2, N_LG/1e6/0.02235, align='center', width=binwidth*c/2, color='r', alpha=0.5, label='Low gain counts (scaled)')
-    ax.plot(t_fine*c/2, fit_rate_seg/1e6, color='r', linestyle='--', label='Fit')
-    ax.plot(t_fine*c/2, photon_rate_arr/1e6, color='k', linestyle='--', label='Truth')
+
+    muller_res_ideal = 50  # [m]
+    muller_res = (muller_res_ideal/c*2 // dt) * dt  # [s]
+    muller_bin_avg = int(muller_res / dt)
+    print('Muller Resolution: {} m'.format(muller_res*c/2))
+    muller_bin_array = set_binwidth(t_min, t_max, muller_res)
+    n_LG_muller, bins_muller = np.histogram(flight_time_LG, bins=muller_bin_array)
+    n_HG_muller, __ = np.histogram(flight_time_HG, bins=muller_bin_array)
+    binwidth_muller = np.diff(bins_muller)[0]
+    N_LG_muller = n_LG_muller / binwidth_muller / n_shots  # [Hz] Scaling counts to arrival rate
+    N_HG_muller = n_HG_muller / binwidth_muller / n_shots  # [Hz]
+    N_LG_muller = N_LG_muller / (1-deadtime*N_LG_muller)  # [Hz] applying Muller correction
+    N_HG_muller = N_HG_muller / (1-deadtime*N_HG_muller)  # [Hz] applying Muller correction
+    center_muller = 0.5 * (bins_muller[:-1] + bins_muller[1:])
+
+    # ax.bar(center_muller * c / 2, N_HG_muller / 1e6 / 0.424, align='center', width=binwidth_muller*c/2, color='teal', alpha=0.75, label='High gain counts (scaled + Muller)')
+    # ax.bar(center_muller * c / 2, N_LG_muller / 1e6 / 0.022, align='center', width=binwidth_muller*c/2, color='magenta', alpha=0.75, label='Low gain counts (scaled + Muller)')
+    ax.bar(center * c / 2, N_LG / 1e6 / 0.05, align='center', width=binwidth*c/2, color='green', alpha=0.75, label='Low gain counts (scaled)')
+    # ax.bar(center * c / 2, N_HG / 1e6 / 0.95, align='center', width=binwidth*c/2, color='green', alpha=1.0, label='High gain counts (scaled)')
+    ax.bar(center * c / 2, N_HG / 1e6, align='center', width=binwidth * c / 2, color='blue', alpha=0.75, label='High gain counts')
+    ax.bar(center * c / 2, N_LG / 1e6, align='center', width=binwidth * c / 2, color='orange', alpha=0.75, label='Low gain counts')
+    ax.plot(t_fine * c / 2, fit_rate_seg / 1e6, color='r', linestyle='--', label='Fit')
+    ax.plot(t_fine * c / 2, photon_rate_arr_tot_eta / 1e6, color='k', linestyle='--', label='Truth (tot eta)')
+    ax.plot(t_fine * c / 2, photon_rate_arr_BS_eta / 1e6, color='m', linestyle='--', label='Truth (BS eta)')
     ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
     # ax.set_title('Arrival Rate Fit: {}{:.2E}'.format('True Rho = ' if use_sim else 'OD = ', rho_list[k] if use_sim else +OD_list[k]))
     ax.set_xlabel('Range [m]')
@@ -292,8 +270,10 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    ax.plot(t_fine[int(bin_avg/2)::bin_avg] * c / 2, np.abs(photon_rate_arr[int(bin_avg/2)::bin_avg] - N_LG / 0.05), color='b', linestyle='--', label='Scaled LG error')
-    ax.plot(t_fine * c / 2, np.abs(photon_rate_arr - fit_rate_seg), color='r', linestyle='--', label='Fit error')
+    ax.plot(t_fine[int(bin_avg/2):-int(bin_avg/2):bin_avg] * c / 2, np.abs(photon_rate_arr_BS_eta[int(bin_avg/2):-int(bin_avg/2):bin_avg] - N_LG / 0.05), color='green', linestyle='--', label='Scaled LG error')
+    # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_LG_muller/0.022), color='magenta', linestyle='--', label='LG Muller error')
+    # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_HG_muller/0.022), color='teal', linestyle='--', label='HG Muller error')
+    ax.plot(t_fine * c / 2, np.abs(photon_rate_arr_BS_eta - fit_rate_seg), color='r', linestyle='--', label='Fit error')
     ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
     ax.set_xlabel('Range [m]')
     ax.set_ylabel('Absolute Error [Hz]')
@@ -306,49 +286,43 @@ if not repeat_run:
     plt.tight_layout()
 
 fit_rate_seg_lst.append(fit_rate_seg)
-flight_time_lst.append(flight_time_LG)
+flight_time_lst_LG.append(flight_time_LG)
+flight_time_lst_HG.append(flight_time_HG)
 active_ratio_hst_lst.append(active_ratio_hst_fit)
 
 plt.show()
 
 
-#
-# # Save to csv file
-# headers = ['{}'.format('Rho' if use_sim else 'OD'), 'Evaluation Loss', 'Optimal Scaling Factor', 'Average %-age where Detector was Active']
-# if use_sim:
-#     df_out = pd.concat([pd.DataFrame(rho_list), pd.DataFrame(eval_final_loss_lst), pd.DataFrame(C_scale_final),
-#                         pd.DataFrame(percent_active_lst)], axis=1)
-# else:
-#     df_out = pd.concat([pd.DataFrame(OD_list), pd.DataFrame(eval_final_loss_lst), pd.DataFrame(C_scale_final),
-#                         pd.DataFrame(percent_active_lst)], axis=1)
+
+# Save to csv file
+headers = ['Evaluation Loss', 'Optimal Scaling Factor', 'Avg %-age Dectector Active LG', 'Avg %-age Dectector Active HG']
+if use_sim:
+    df_out = pd.concat([pd.DataFrame(eval_final_loss_lst), pd.DataFrame(C_scale_final),
+                        pd.DataFrame(percent_active_LG_lst), pd.DataFrame(percent_active_HG_lst)], axis=1)
+else:
+    df_out = pd.concat([pd.DataFrame(eval_final_loss_lst), pd.DataFrame(C_scale_final),
+                        pd.DataFrame(percent_active_LG_lst), pd.DataFrame(percent_active_HG_lst)], axis=1)
 # if repeat_run:
 #     save_csv_file_temp = save_csv_file[:-4] + '_run#{}.csv'.format(repeat_range[j])
 #     save_csv_file_fit_temp = save_csv_file_fit[:-4] + '_run#{}.csv'.format(repeat_range[j])
 #     save_dframe_fname_temp = save_dframe_fname[:-4] + '_run#{}.pkl'.format(repeat_range[j])
 # else:
-#     save_csv_file_temp = save_csv_file
-#     save_csv_file_fit_temp = save_csv_file_fit
-#     save_dframe_fname_temp = save_dframe_fname
-#
-# df_out = df_out.to_csv(save_dir + save_csv_file_temp, header=headers)
-#
-# if use_sim:
-#     headers = ['Rho' + str(i) for i in rho_list[start_idx:stop_idx]]
-# else:
-#     headers = ['OD'+str(i) for i in OD_list[start_idx:stop_idx]]
-# headers.insert(0, 'time vector')
-# df_out = pd.DataFrame(np.array(fit_rate_seg_lst).T.tolist())
-# df_out = pd.concat([pd.DataFrame(t_fine), df_out], axis=1)
-# df_out = df_out.to_csv(save_dir + save_csv_file_fit_temp, header=headers)
-#
-# if use_sim:
-#     dframe = [flight_time_lst, flight_time_ref, t_min, t_max, dt, n_shots, n_shots_ref, active_ratio_hst_lst, true_rho_lst]
-# else:
-#     dframe = [flight_time_lst, flight_time_ref, t_min, t_max, dt, n_shots, n_shots_ref, active_ratio_hst_lst]
-# pickle.dump(dframe, open(save_dir+save_dframe_fname_temp, 'wb'))
-#
-# print('Total run time: {} seconds'.format(time.time()-start))
-#
+save_csv_file_temp = save_csv_file
+save_csv_file_fit_temp = save_csv_file_fit
+save_dframe_fname_temp = save_dframe_fname
+
+df_out = df_out.to_csv(save_dir + save_csv_file_temp, header=headers)
+
+headers = ['time vector', 'fit profile']
+df_out = pd.DataFrame(np.array(fit_rate_seg_lst).T.tolist())
+df_out = pd.concat([pd.DataFrame(t_fine), df_out], axis=1)
+df_out = df_out.to_csv(save_dir + save_csv_file_fit_temp, header=headers)
+
+dframe = [flight_time_lst_LG, flight_time_lst_HG, t_min, t_max, dt, n_shots, active_ratio_hst_fit_LG, active_ratio_hst_fit_HG]
+pickle.dump(dframe, open(save_dir+save_dframe_fname_temp, 'wb'))
+
+print('Total run time: {} seconds'.format(time.time()-start))
+
 # if not repeat_run:
 #     fig = plt.figure()
 #     ax = fig.add_subplot(111)

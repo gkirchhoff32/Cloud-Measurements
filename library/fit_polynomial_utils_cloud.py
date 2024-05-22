@@ -251,7 +251,6 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
     t_min, t_max = t_fine[0], t_fine[-1]
 
     val_loss_arr = np.full(M_max+1, np.nan)
-    # eval_loss_arr = np.zeros(M_max+1)
     coeffs = np.zeros((M_max+1, M_max+1))
     fit_rate_fine = np.zeros((M_max+1, len(t_fine)))
     C_scale_arr = np.zeros(M_max+1)
@@ -291,8 +290,6 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         t_fit_norm_HG = fit_model.tstamp_condition(t_phot_fit_tnsr_HG, t_min, t_max)
         t_val_norm_LG = fit_model.tstamp_condition(t_phot_val_tnsr_LG, t_min, t_max)
         t_val_norm_HG = fit_model.tstamp_condition(t_phot_val_tnsr_HG, t_min, t_max)
-        # t_N_fit = np.max(t_phot_fit_tnsr_LG.detach().numpy())
-        # t_N_val = np.max(t_phot_val_tnsr.detach().numpy())
         t_intgrl = cheby_poly(torch.linspace(0, 1, intgrl_N), M)
 
         bins = np.append(t_fine, t_fine[-1]+np.diff(t_fine)[0])
@@ -302,11 +299,8 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         Y_val_HG = torch.from_numpy(np.histogram(t_phot_val_tnsr_HG.detach().numpy(), bins=bins)[0])
         while rel_step > rel_step_lim and epoch < max_epochs:
             fit_model.train()
-            # pred_fit, integral_fit = fit_model(intgrl_N, active_ratio_hst_fit, t_fit_norm, t_N_fit, t_intgrl, cheby=True)
             fine_res_model_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, cheby=True)
             fine_res_model_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
-            # pred_fit_LG = fine_res_model_LG  # [Hz]
-            # pred_fit_HG = fine_res_model_HG  # [Hz]
             eta_LG = 0.05
             eta_HG = 0.95
             # eta_LG = 0.022356960252165003
@@ -334,7 +328,6 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
 
             epoch += 1
 
-        print(epoch)
         t_fine_tensor = torch.tensor(t_fine)
         pred_mod_seg, __ = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fine_tensor, t_intgrl, cheby=False)
         fit_rate_fine[M, :] = pred_mod_seg.detach().numpy().T
