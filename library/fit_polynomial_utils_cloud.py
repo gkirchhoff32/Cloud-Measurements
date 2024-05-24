@@ -78,43 +78,33 @@ class Fit_Pulse(torch.nn.Module):
         model_out = torch.exp(poly) + self.B  # Forward model
         plt.close()
 
-        # # This is what you used to do for the deadtime experiments:
-        # # calculate the integral
-        # t_poly_cheb = t_intgrl
-        # poly = t_poly_cheb @ self.C
-        # fine_res_model = torch.exp(poly) + self.B
-        #
-        # t_fine, dt = np.linspace(self.t_min, self.t_max, intgrl_N, endpoint=False, retstep=True)
-        # t_max_idx = np.argmin(np.abs(t_fine-t_N))
-        # active_ratio_hst.resize_(fine_res_model.size())
-        # fine_res_model = fine_res_model * active_ratio_hst  # Generate deadtime noise model
-        # integral_out = self.riemann(fine_res_model, dt)
-
+        # This is what you used to do for the deadtime experiments:
+        # calculate the integral
         poly = t_intgrl @ self.C
         fine_res_model = torch.exp(poly) + self.B
-        fine_res_model = torch.reshape(fine_res_model, active_ratio_hst.size())
-        t_fine, dt = np.linspace(self.t_min, self.t_max, intgrl_N+1, endpoint=True, retstep=True)
-        # active_ratio_hst = torch.reshape(active_ratio_hst, fine_res_model.size())
 
-        return fine_res_model, dt
+        __, dt = np.linspace(self.t_min, self.t_max, intgrl_N, endpoint=False, retstep=True)
+        active_ratio_hst.resize_(fine_res_model.size())
+        fine_res_model *= active_ratio_hst  # Generate deadtime noise model
+        integral_out = self.riemann(fine_res_model, dt)
+
+        return model_out, integral_out
 
 
-def pois_loss(pred_fit, eta, active_ratio_hst, dt, Y, Nshots):
+# def pois_loss(pred_fit, eta, active_ratio_hst, dt, Y, Nshots):
+#     """
+#     Non-homogenous Poisson point process loss function
+#     """
+#     # return integral-torch.sum(torch.log(prof))\
+#     loss = torch.sum(Nshots*eta*pred_fit*active_ratio_hst*dt - Y*torch.log(eta*pred_fit))
+#
+#     return loss
+
+def pois_loss(integral, prof, eta):
     """
     Non-homogenous Poisson point process loss function
     """
-    # return integral-torch.sum(torch.log(prof))\
-    # Y = torch.from_numpy(Y)
-
-    # pred_fit = np.array(pred_fit.detach())
-    # active_ratio_hst = active_ratio_hst.detach().numpy()
-
-    # Y = torch.reshape(Y, pred_fit.size())
-    # test_out = Y * torch.log(eta*pred_fit)
-    loss = torch.sum(Nshots*eta*pred_fit*active_ratio_hst*dt - Y*torch.log(eta*pred_fit))
-    # loss = -np.log(eta) + torch.sum(Nshots*pred_fit*active_ratio_hst*dt - Y*torch.log(pred_fit))
-
-    return loss
+    return eta*integral-torch.sum(torch.log(eta*prof))
 
 # Chebyshev polynomial matrix generator
 def cheby_poly(x, M):
@@ -299,15 +289,14 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         Y_val_HG = torch.from_numpy(np.histogram(t_phot_val_tnsr_HG.detach().numpy(), bins=bins)[0])
         while rel_step > rel_step_lim and epoch < max_epochs:
             fit_model.train()
-            fine_res_model_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, cheby=True)
-            fine_res_model_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
             eta_LG = 0.05
             eta_HG = 0.95
-            # eta_LG = 0.022356960252165003
-            # eta_HG = 0.424782244791135
-            loss_fit_LG = loss_fn(fine_res_model_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
-            loss_fit_HG = loss_fn(fine_res_model_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
-            loss_fit = loss_fit_LG + loss_fit_HG
+            pred_fit_LG, integral_fit_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, cheby=True)
+            pred_fit_HG, integral_fit_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
+            loss_fit_LG = loss_fn(integral_fit_LG, pred_fit_LG, eta_LG)  # add regularization here
+            loss_fit_HG = loss_fn(integral_fit_HG, pred_fit_HG, eta_HG)  # add regularization here
+            # loss_fit = loss_fit_LG + loss_fit_HG
+            loss_fit = loss_fit_LG/eta_LG + loss_fit_HG/eta_HG
             # loss_fit = loss_fit_HG
             fit_loss_lst += [loss_fit.item()]
 
@@ -335,11 +324,11 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
 
         # Calculate validation loss
         # Using fit generated from fit set, calculate loss when applied to validation set
-        pred_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, cheby=True)
-        pred_val_HG, __ = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, cheby=True)
-        loss_val_LG = loss_fn(pred_val_LG, eta_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
-        loss_val_HG = loss_fn(pred_val_HG, eta_HG, active_ratio_hst_val_HG, dt, Y_val_HG, n_shots_val_HG)  # add regularization here
-        val_loss_arr[M] = loss_val_LG + loss_val_HG
+        pred_val_LG, integral_val_LG = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, cheby=True)
+        pred_val_HG, integral_val_HG = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, cheby=True)
+        loss_val_LG = loss_fn(integral_val_LG, pred_val_LG, eta_LG)  # add regularization here
+        loss_val_HG = loss_fn(integral_val_HG, pred_val_HG, eta_HG)  # add regularization here
+        val_loss_arr[M] = loss_val_LG/eta_LG + loss_val_HG/eta_HG
 
         # Now use the generated fit and calculate loss against evaluation set (e.g., no deadtime, high-OD data)
         # When evaluating, I don't want to use the deadtime model as my evaluation metric. So I will use the Poisson loss function.

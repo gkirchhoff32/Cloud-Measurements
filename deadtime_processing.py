@@ -38,7 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 99  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 499  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -62,7 +62,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 22
+M_max = 12
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -137,6 +137,7 @@ if use_sim:
     ds_LG = xr.open_dataset(load_dir + fname_LG)
 
     photon_rate_arr_LG = ds_LG.photon_rate_arr.to_numpy()
+    ds_HG = xr.open_dataset(load_dir + fname_HG)
     og_t_fine = np.arange(0, 2000/c*2, dt)
     idx_min = np.argmin(abs(og_t_fine - t_min))
     photon_rate_arr_LG = photon_rate_arr_LG[idx_min:idx_min+len(t_fine)]
