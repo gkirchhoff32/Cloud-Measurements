@@ -38,7 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 99  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 999  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -62,7 +62,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 22
+M_max = 12
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -229,8 +229,7 @@ if not repeat_run:
     N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
     N_HG = n_HG / binwidth / n_shots  # [Hz]
     # try accomodating for combined high-gain and low-gain signals
-    photon_rate_arr_tot_eta = photon_rate_arr_LG / 0.022
-    photon_rate_arr_BS_eta = photon_rate_arr_LG / 0.05
+    photon_rate_arr = photon_rate_arr_LG / 0.05
     center = 0.5 * (bins[:-1] + bins[1:])
 
     muller_res_ideal = 50  # [m]
@@ -254,8 +253,7 @@ if not repeat_run:
     ax.bar(center * c / 2, N_HG / 1e6, align='center', width=binwidth * c / 2, color='blue', alpha=0.75, label='High gain counts')
     ax.bar(center * c / 2, N_LG / 1e6, align='center', width=binwidth * c / 2, color='orange', alpha=0.75, label='Low gain counts')
     ax.plot(t_fine * c / 2, fit_rate_seg / 1e6, color='r', linestyle='--', label='Fit')
-    ax.plot(t_fine * c / 2, photon_rate_arr_tot_eta / 1e6, color='k', linestyle='--', label='Truth (tot eta)')
-    ax.plot(t_fine * c / 2, photon_rate_arr_BS_eta / 1e6, color='m', linestyle='--', label='Truth (BS eta)')
+    ax.plot(t_fine * c / 2, photon_rate_arr / 1e6, color='m', linestyle='--', label='Truth (BS eta)')
     ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
     # ax.set_title('Arrival Rate Fit: {}{:.2E}'.format('True Rho = ' if use_sim else 'OD = ', rho_list[k] if use_sim else +OD_list[k]))
     ax.set_xlabel('Range [m]')
@@ -270,10 +268,10 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    ax.plot(t_fine[int(bin_avg/2):-int(bin_avg/2):bin_avg] * c / 2, np.abs(photon_rate_arr_BS_eta[int(bin_avg/2):-int(bin_avg/2):bin_avg] - N_LG / 0.05), color='green', linestyle='--', label='Scaled LG error')
+    ax.plot(t_fine[int(bin_avg/2):-int(bin_avg/2):bin_avg] * c / 2, np.abs(photon_rate_arr[int(bin_avg/2):-int(bin_avg/2):bin_avg] - N_LG / 0.05), color='green', linestyle='--', label='Scaled LG error')
     # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_LG_muller/0.022), color='magenta', linestyle='--', label='LG Muller error')
     # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_HG_muller/0.022), color='teal', linestyle='--', label='HG Muller error')
-    ax.plot(t_fine * c / 2, np.abs(photon_rate_arr_BS_eta - fit_rate_seg), color='r', linestyle='--', label='Fit error')
+    ax.plot(t_fine * c / 2, np.abs(photon_rate_arr - fit_rate_seg), color='r', linestyle='--', label='Fit error')
     ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
     ax.set_xlabel('Range [m]')
     ax.set_ylabel('Absolute Error [Hz]')

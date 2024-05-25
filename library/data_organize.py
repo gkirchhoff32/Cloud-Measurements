@@ -30,9 +30,11 @@ def data_organize(dt, data_dir, fname, window_bnd, max_lsr_num, exclude_shots=Tr
     cnts = ds.time_tag
     flight_time = cnts * dt  # [s]
     # Exclude specified t.o.f. bins
-    flight_time = flight_time[np.where((flight_time >= window_bnd[0]) & (flight_time < window_bnd[1]))]
-    lsr_shot_cntr = ds.sync_index.to_numpy()
+    valid_idx = np.where((flight_time >= window_bnd[0]) & (flight_time < window_bnd[1]))
+    flight_time = flight_time[valid_idx]
     ttag_sync_idx = ds.time_tag_sync_index.values
+    ttag_sync_idx = ttag_sync_idx[valid_idx]
+    lsr_shot_cntr = ds.sync_index.to_numpy()
 
     if exclude_shots:
         # Obtain sync index corresponding to maximum laser shot number specified by user. If the exact index doesn't
