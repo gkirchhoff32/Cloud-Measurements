@@ -48,7 +48,7 @@ use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
-window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([850, 1200])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 deadtime = 29.1e-9  # [s]
 dt = 25e-12  # [s] TCSPC resolution
@@ -61,8 +61,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 11
-M_max = 12
+M_min = 25
+M_max = 26
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
