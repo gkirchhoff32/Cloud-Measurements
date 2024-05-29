@@ -61,8 +61,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 25
-M_max = 26
+M_min = 29
+M_max = 30
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
