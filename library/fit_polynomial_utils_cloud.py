@@ -236,7 +236,7 @@ def generate_fit_val(data, t_det_lst, n_shots):
 
 # Generate fit routine
 def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_ratio_hst_fit,
-                active_ratio_hst_val, n_shots_fit, n_shots_val, learning_rate=1e-1,
+                active_ratio_hst_val, n_shots_fit, n_shots_val, T_BS, learning_rate=1e-1,
                 rel_step_lim=1e-8, intgrl_N=10000, max_epochs=4000, term_persist=20):
 
     t_min, t_max = t_fine[0], t_fine[-1]
@@ -246,6 +246,8 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
     fit_rate_fine = np.zeros((M_max+1, len(t_fine)))
     C_scale_arr = np.zeros(M_max+1)
     print('Time elapsed:\n')
+
+    T_BS_LG, T_BS_HG = T_BS[0], T_BS[1]
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -292,14 +294,16 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
             fit_model.train()
             fine_res_model_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, cheby=True)
             fine_res_model_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, cheby=True)
-            eta_LG = 0.05
-            eta_HG = 0.95
+            eta_LG = T_BS_LG
+            eta_HG = T_BS_HG
+            # eta_LG = 0.02
+            # eta_HG = 0.42
             loss_fit_LG = loss_fn(fine_res_model_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
             loss_fit_HG = loss_fn(fine_res_model_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
             # loss_fit = loss_fit_LG/np.sqrt(np.sum(Y_fit_LG.cpu().detach().numpy()**2)) + loss_fit_HG/np.sqrt(np.sum(Y_fit_HG.cpu().detach().numpy()**2))
-            # loss_fit = loss_fit_LG/torch.sum(Y_fit_LG) + loss_fit_HG/torch.sum(Y_fit_HG)
+            loss_fit = loss_fit_LG/torch.sum(Y_fit_LG) + loss_fit_HG/torch.sum(Y_fit_HG)
             # loss_fit = loss_fit_LG + loss_fit_HG
-            loss_fit = loss_fit_HG
+            # loss_fit = loss_fit_LG
 
             fit_loss_lst += [loss_fit.item()]
 

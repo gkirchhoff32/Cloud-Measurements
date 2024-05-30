@@ -38,7 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 999  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 499  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -48,7 +48,7 @@ use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 
-window_bnd = np.array([850, 1200])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 deadtime = 29.1e-9  # [s]
 dt = 25e-12  # [s] TCSPC resolution
@@ -61,8 +61,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 29
-M_max = 30
+M_min = 18
+M_max = 19
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -75,8 +75,8 @@ load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\S
 save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 # fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
 
-fname_LG = r'\simnum_4_nshot1.00E+03_useHGFalse.nc'
-fname_HG = r'\simnum_4_nshot1.00E+03_useHGTrue.nc'
+fname_LG = r'\simnum_0_nshot5.00E+02_useHGFalse_T0.05.nc'
+fname_HG = r'\simnum_0_nshot5.00E+02_useHGTrue_T0.95.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -119,8 +119,8 @@ flight_time_lst_HG = []
 active_ratio_hst_lst = []
 
 # Obtain the OD value from the file name. Follow the README guide to ascertain the file naming convention
-flight_time_LG, n_shots, t_det_lst_LG = dorg.data_organize(dt, load_dir, fname_LG, window_bnd, max_lsr_num_fit, exclude_shots)
-flight_time_HG, __, t_det_lst_HG = dorg.data_organize(dt, load_dir, fname_HG, window_bnd, max_lsr_num_fit, exclude_shots)
+flight_time_LG, n_shots, t_det_lst_LG, T_BS_LG = dorg.data_organize(dt, load_dir, fname_LG, window_bnd, max_lsr_num_fit, exclude_shots)
+flight_time_HG, __, t_det_lst_HG, T_BS_HG = dorg.data_organize(dt, load_dir, fname_HG, window_bnd, max_lsr_num_fit, exclude_shots)
 
 flight_time_LG = flight_time_LG.values
 flight_time_HG = flight_time_HG.values
@@ -137,7 +137,8 @@ if use_sim:
     ds_LG = xr.open_dataset(load_dir + fname_LG)
 
     photon_rate_arr_LG = ds_LG.photon_rate_arr.to_numpy()
-    og_t_fine = np.arange(0, 2000/c*2, dt)
+    og_t_min, og_t_max = ds_LG.t_sim_bins.values[0], ds_LG.t_sim_bins.values[-1]
+    og_t_fine = np.arange(og_t_min, og_t_max, dt)  # [s]
     idx_min = np.argmin(abs(og_t_fine - t_min))
     photon_rate_arr_LG = photon_rate_arr_LG[idx_min:idx_min+len(t_fine)]
 
@@ -178,13 +179,14 @@ active_ratio_hst_fit = [active_ratio_hst_fit_LG, active_ratio_hst_fit_HG]
 active_ratio_hst_val = [active_ratio_hst_val_LG, active_ratio_hst_val_HG]
 n_shots_fit = [n_shots_fit_LG, n_shots_fit_HG]
 n_shots_val = [n_shots_val_LG, n_shots_val_HG]
+T_BS = [T_BS_LG, T_BS_HG]
 
 # Run fit optimizer
 ax, val_loss_arr, \
 fit_rate_fine, coeffs, \
 C_scale_arr = fit.optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr,
                                active_ratio_hst_fit, active_ratio_hst_val, n_shots_fit,
-                               n_shots_val, learning_rate, rel_step_lim, intgrl_N, max_epochs,
+                               n_shots_val, T_BS, learning_rate, rel_step_lim, intgrl_N, max_epochs,
                                term_persist)
 
 ax.set_ylabel('Loss')
@@ -229,7 +231,7 @@ if not repeat_run:
     N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
     N_HG = n_HG / binwidth / n_shots  # [Hz]
     # try accomodating for combined high-gain and low-gain signals
-    photon_rate_arr = photon_rate_arr_LG / 0.05
+    photon_rate_arr = photon_rate_arr_LG / T_BS_LG
     center = 0.5 * (bins[:-1] + bins[1:])
 
     muller_res_ideal = 50  # [m]
@@ -248,7 +250,7 @@ if not repeat_run:
 
     # ax.bar(center_muller * c / 2, N_HG_muller / 1e6 / 0.424, align='center', width=binwidth_muller*c/2, color='teal', alpha=0.75, label='High gain counts (scaled + Muller)')
     # ax.bar(center_muller * c / 2, N_LG_muller / 1e6 / 0.022, align='center', width=binwidth_muller*c/2, color='magenta', alpha=0.75, label='Low gain counts (scaled + Muller)')
-    ax.bar(center * c / 2, N_LG / 1e6 / 0.05, align='center', width=binwidth*c/2, color='green', alpha=0.75, label='Low gain counts (scaled)')
+    ax.bar(center * c / 2, N_LG / 1e6 / T_BS_LG, align='center', width=binwidth*c/2, color='green', alpha=0.75, label='Low gain counts (scaled)')
     # ax.bar(center * c / 2, N_HG / 1e6 / 0.95, align='center', width=binwidth*c/2, color='green', alpha=1.0, label='High gain counts (scaled)')
     ax.bar(center * c / 2, N_HG / 1e6, align='center', width=binwidth * c / 2, color='blue', alpha=0.75, label='High gain counts')
     ax.bar(center * c / 2, N_LG / 1e6, align='center', width=binwidth * c / 2, color='orange', alpha=0.75, label='Low gain counts')
@@ -268,7 +270,7 @@ if not repeat_run:
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    ax.plot(t_fine[int(bin_avg/2):-int(bin_avg/2):bin_avg] * c / 2, np.abs(photon_rate_arr[int(bin_avg/2):-int(bin_avg/2):bin_avg] - N_LG / 0.05), color='green', linestyle='--', label='Scaled LG error')
+    ax.plot(t_fine[int(bin_avg/2):-int(bin_avg/2):bin_avg] * c / 2, np.abs(photon_rate_arr[int(bin_avg/2):-int(bin_avg/2):bin_avg] - N_LG / T_BS_LG), color='green', linestyle='--', label='Scaled LG error')
     # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_LG_muller/0.022), color='magenta', linestyle='--', label='LG Muller error')
     # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_HG_muller/0.022), color='teal', linestyle='--', label='HG Muller error')
     ax.plot(t_fine * c / 2, np.abs(photon_rate_arr - fit_rate_seg), color='r', linestyle='--', label='Fit error')

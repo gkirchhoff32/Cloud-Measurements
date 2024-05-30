@@ -29,7 +29,7 @@ create_csv = False  # Set TRUE to generate a .csv from .ARSENL data
 load_data = True  # Set TRUE to load data into a DataFrame and serialize into a pickle object
 load_netcdf = True  # Set TRUE if loading from netcdf file ('*.ARSENL.nc'). Set FALSE if loading from *.ARSENL file.
 use_donovan = False  # Set TRUE if user wants to scale the histogram by using the Donovan correction
-limit_shots = True
+limit_shots = False
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set temporal boundaries for binning
 window_bnd = np.array([850, 1200])  # [m] Set boundaries for binning to exclude outliers
@@ -38,7 +38,7 @@ dt = 25e-12  # [s] Resolution
 deadtime = 29.1e-9  # [s] Deadtime interval (25ns for sim, 29.1ns for SPCM)
 
 if limit_shots:
-    use_shots = 50
+    use_shots = 250
 
 t_min = window_bnd[0]  # [s]
 t_max = window_bnd[1]  # [s]
@@ -46,7 +46,7 @@ t_max = window_bnd[1]  # [s]
 if load_netcdf:
     home = str(Path.home())
     data_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\saved_sims'
-    fname = r'\\simnum_7_nshot5.00E+02_useHGFalse.nc'
+    fname = r'\\simnum_0_nshot5.00E+02_useHGTrue_T0.95.nc'
 
     ds = xr.open_dataset(data_dir + fname)
 
