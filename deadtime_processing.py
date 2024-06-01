@@ -61,8 +61,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 18
-M_max = 19
+M_min = 11
+M_max = 12
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -75,8 +75,8 @@ load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\S
 save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 # fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
 
-fname_LG = r'\simnum_0_nshot5.00E+02_useHGFalse_T0.05.nc'
-fname_HG = r'\simnum_0_nshot5.00E+02_useHGTrue_T0.95.nc'
+fname_LG = r'\simnum_4_nshot1.00E+03_useHGFalse_T0.05.nc'
+fname_HG = r'\simnum_4_nshot1.00E+03_useHGTrue_T0.95.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -168,6 +168,19 @@ else:
 
     active_ratio_hst_fit_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_HG, n_shots_fit_HG)
     active_ratio_hst_val_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_HG, n_shots_val_HG)
+
+
+# fig = plt.figure()
+# ax = fig.add_subplot(111)
+# ax.plot(t_fine*c/2, active_ratio_hst_fit_LG, label='low gain')
+# ax.plot(t_fine*c/2, active_ratio_hst_fit_HG, label='high gain')
+# ax.set_xlabel('Range [m]')
+# ax.set_ylabel('AF')
+# plt.legend()
+# plt.show()
+#
+# quit()
+
 percent_active_LG = torch.sum(active_ratio_hst_fit_LG).item()/len(active_ratio_hst_fit_LG)
 percent_active_LG_lst.append(percent_active_LG)
 percent_active_HG = torch.sum(active_ratio_hst_fit_HG).item()/len(active_ratio_hst_fit_HG)

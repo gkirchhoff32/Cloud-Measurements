@@ -172,7 +172,11 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
             # Only include detections that fall within fitting window
             if det_time >= (t_min-deadtime) and det_time <= t_max:
                 det_bin_idx = np.argmin(abs(det_time - bin_edges))  # Bin that detection falls into
-                final_dead_bin = det_bin_idx + deadtime_n_bins  # Final bin index that deadtime occupies
+                if det_time < t_min:
+                    deadtime_n_bins_adjusted = deadtime_n_bins - np.floor(t_min-det_time / dt).astype(int)
+                    final_dead_bin = det_bin_idx + deadtime_n_bins_adjusted
+                else:
+                    final_dead_bin = det_bin_idx + deadtime_n_bins  # Final bin index that deadtime occupies
 
                 # Currently a crutch that assumes "dead" time >> potwindow. Will need to include "wrap around" to be more accurate
                 # If final dead bin surpasses fit window, set it to the window upper bin

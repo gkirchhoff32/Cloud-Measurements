@@ -73,8 +73,7 @@ def data_organize(dt, data_dir, fname, window_bnd, max_lsr_num, exclude_shots=Tr
     # Generate nested list of DataArrays, where each array consists of the detections per laser shot
     t_det_lst = []
     for i in range(len(flight_time)):
-        total_det = ds.time_tag[i].values
-        total_det = total_det * dt  # Convert from 25ps intervals to seconds
+        total_det = flight_time[i]  # [s]
         total_det = np.array(total_det, ndmin=1, copy=False)
         # If there are more than one detection per laser event, then append those to the same row in t_det_lst. Otherwise just append to a new row like normal.
         if ttag_sync_idx[i] == ttag_sync_idx[i-1]:
