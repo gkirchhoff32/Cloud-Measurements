@@ -38,7 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 499  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 299  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
@@ -62,7 +62,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 12
+M_max = 24
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -75,8 +75,8 @@ load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\S
 save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 # fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
 
-fname_LG = r'\simnum_4_nshot1.00E+03_useHGFalse_T0.05.nc'
-fname_HG = r'\simnum_4_nshot1.00E+03_useHGTrue_T0.95.nc'
+fname_LG = r'\simnum_0_nshot5.00E+02_useHGFalse_T0.05.nc'
+fname_HG = r'\simnum_0_nshot5.00E+02_useHGTrue_T0.95.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
