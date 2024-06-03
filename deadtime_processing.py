@@ -38,7 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 299  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 499  # Maximum number of laser shots for the fit dataset
 # use_final_idx = True  # Set TRUE if you want to use up to the OD value preceding the reference OD
 # start_idx = 5  # If 'use_final_idx' FALSE, set the min idx value to this value (for troubleshooting purposes)
 # stop_idx = 6  # If 'use_final_idx' FALSE, set the max+1 idx value to this value (for troubleshooting purposes)
