@@ -47,8 +47,9 @@ include_deadtime = True  # Set TRUE to include deadtime in noise model
 use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
+discrete_loss = True  # Set TRUE if using the discrete histogram form of the loss function. Set FALSE if using the time-tag form.
 
-window_bnd = np.array([925, 1050])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 deadtime = 29.1e-9  # [s]
 dt = 25e-12  # [s] TCSPC resolution
@@ -62,7 +63,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 24
+M_max = 19
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -199,7 +200,7 @@ ax, val_loss_arr, \
 fit_rate_fine, coeffs, \
 C_scale_arr = fit.optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr,
                                active_ratio_hst_fit, active_ratio_hst_val, n_shots_fit,
-                               n_shots_val, T_BS, learning_rate, rel_step_lim, intgrl_N, max_epochs,
+                               n_shots_val, T_BS, discrete_loss, learning_rate, rel_step_lim, intgrl_N, max_epochs,
                                term_persist)
 
 ax.set_ylabel('Loss')
@@ -295,6 +296,7 @@ if not repeat_run:
     ax.text(0.1, 0.90, 'Polynomial order: {}'.format(min_order), transform=ax.transAxes, fontsize=14,
             verticalalignment='top', bbox=props)
     ax.semilogy()
+    ax.set_ylim([1e4, 1e9])
     plt.legend()
     plt.tight_layout()
 
