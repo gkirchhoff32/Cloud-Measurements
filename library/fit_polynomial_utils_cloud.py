@@ -363,9 +363,9 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
             loss_val_LG = loss_fn(pred_val_LG, integral_val_LG, n_shots_val_LG, eta_LG)
             loss_val_HG = loss_fn(pred_val_HG, integral_val_HG, n_shots_val_HG, eta_HG)
         # val_loss_arr[M] = loss_val_LG/torch.sqrt(torch.sum(Y_val_LG**2)) + loss_val_HG/torch.sqrt(torch.sum(Y_val_HG**2))
-        # val_loss_arr[M] = loss_val_LG/torch.sum(Y_val_LG) + loss_val_HG/torch.sum(Y_val_HG)
+        val_loss_arr[M] = loss_val_LG/torch.sum(Y_val_LG) + loss_val_HG/torch.sum(Y_val_HG)
         # val_loss_arr[M] = loss_val_LG + loss_val_HG
-        val_loss_arr[M] = loss_val_LG
+        # val_loss_arr[M] = loss_val_LG
 
         # Now use the generated fit and calculate loss against evaluation set (e.g., no deadtime, high-OD data)
         # When evaluating, I don't want to use the deadtime model as my evaluation metric. So I will use the Poisson loss function.

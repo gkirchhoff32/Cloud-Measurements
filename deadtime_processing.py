@@ -53,6 +53,7 @@ window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude 
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 deadtime = 29.1e-9  # [s]
 dt = 25e-12  # [s] TCSPC resolution
+downsamp = 200  # downsample factor
 
 # Optimization parameters
 rel_step_lim = 1e-8  # termination criteria based on step size
@@ -99,7 +100,7 @@ save_dframe_fname = r'\fit_figures\eval_loss_dtime{}_simnum{}_order{}-{}' \
 # I define the max/min times as fixed values. They are the upper/lower bounds of the fit.
 t_min = window_bnd[0]  # [s]
 t_max = window_bnd[1]  # [s]
-t_fine = np.arange(t_min, t_max, dt)  # [s]
+t_fine = np.arange(t_min, t_max, dt*downsamp)  # [s]
 
 intgrl_N = len(t_fine)
 
@@ -139,7 +140,8 @@ if use_sim:
     og_t_min, og_t_max = ds_LG.t_sim_bins.values[0], ds_LG.t_sim_bins.values[-1]
     og_t_fine = np.arange(og_t_min, og_t_max, dt)  # [s]
     idx_min = np.argmin(abs(og_t_fine - t_min))
-    photon_rate_arr_LG = photon_rate_arr_LG[idx_min:idx_min+len(t_fine)]
+    photon_rate_arr_LG = photon_rate_arr_LG[idx_min:idx_min+len(t_fine)*downsamp]
+    photon_rate_arr_LG = photon_rate_arr_LG[::downsamp]
 
 try:
     t_phot_fit_tnsr_LG, t_phot_val_tnsr_LG, \
@@ -221,6 +223,7 @@ if not repeat_run:
     ax = fig.add_subplot(111)
 
     res_ideal = 2  # [m]
+    dt *= downsamp
     res = (res_ideal/c*2 // dt) * dt  # [s]
     bin_avg = int(res / dt)
     print('Figure Resolution: {} m'.format(res*c/2))
