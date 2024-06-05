@@ -322,9 +322,9 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
                 loss_fit_LG = loss_fn(pred_fit_LG, integral_LG, n_shots_fit_LG, eta_LG)
                 loss_fit_HG = loss_fn(pred_fit_HG, integral_HG, n_shots_fit_HG, eta_HG)
             # loss_fit = loss_fit_LG/torch.sqrt(torch.sum(Y_fit_LG**2)) + loss_fit_HG/torch.sqrt(torch.sum(Y_fit_HG**2))
-            # loss_fit = loss_fit_LG/torch.sum(Y_fit_LG) + loss_fit_HG/torch.sum(Y_fit_HG)
+            loss_fit = loss_fit_LG/torch.sum(Y_fit_LG) + loss_fit_HG/torch.sum(Y_fit_HG)
             # loss_fit = loss_fit_LG + loss_fit_HG
-            loss_fit = loss_fit_LG
+            # loss_fit = loss_fit_LG
 
             fit_loss_lst += [loss_fit.item()]
 

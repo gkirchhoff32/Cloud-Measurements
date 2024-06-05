@@ -63,7 +63,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 11
-M_max = 19
+M_max = 12
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -125,8 +125,6 @@ flight_time_HG, __, t_det_lst_HG, T_BS_HG = dorg.data_organize(dt, load_dir, fna
 
 flight_time_LG = flight_time_LG.values
 flight_time_HG = flight_time_HG.values
-# flight_time_com = np.concatenate((flight_time_LG, flight_time_HG), axis=None)
-# t_det_lst_com = t_det_lst_LG + t_det_lst_HG
 
 num_det_LG = len(flight_time_LG)
 num_det_HG = len(flight_time_HG)
@@ -169,18 +167,6 @@ else:
 
     active_ratio_hst_fit_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_fit_HG, n_shots_fit_HG)
     active_ratio_hst_val_HG = fit.deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst_val_HG, n_shots_val_HG)
-
-
-# fig = plt.figure()
-# ax = fig.add_subplot(111)
-# ax.plot(t_fine*c/2, active_ratio_hst_fit_LG, label='low gain')
-# ax.plot(t_fine*c/2, active_ratio_hst_fit_HG, label='high gain')
-# ax.set_xlabel('Range [m]')
-# ax.set_ylabel('AF')
-# plt.legend()
-# plt.show()
-#
-# quit()
 
 percent_active_LG = torch.sum(active_ratio_hst_fit_LG).item()/len(active_ratio_hst_fit_LG)
 percent_active_LG_lst.append(percent_active_LG)
