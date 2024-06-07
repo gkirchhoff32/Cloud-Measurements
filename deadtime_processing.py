@@ -53,7 +53,8 @@ window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude 
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 deadtime = 29.1e-9  # [s]
 dt = 25e-12  # [s] TCSPC resolution
-downsamp = 200  # downsample factor
+downsamp = 10  # downsample factor
+downsamp_hist = True  # set TRUE if averaging histograms for ONLY the plotting
 
 # Optimization parameters
 rel_step_lim = 1e-8  # termination criteria based on step size
@@ -101,12 +102,7 @@ save_dframe_fname = r'\fit_figures\eval_loss_dtime{}_simnum{}_order{}-{}' \
 t_min = window_bnd[0]  # [s]
 t_max = window_bnd[1]  # [s]
 t_fine = np.arange(t_min, t_max, dt*downsamp)  # [s]
-
-intgrl_N = len(t_fine)
-
-# Generate "active-ratio histogram" that adjusts the histogram proportionally according to how many bins the detector
-# was "active vs dead"
-bin_edges = np.linspace(t_min, t_max, intgrl_N+1, endpoint=False)
+print('Time res: {} s'.format(dt*downsamp))
 
 # Fitting routine
 # for j in range(len(repeat_range)):
@@ -157,7 +153,10 @@ except:
     exit()
 
 # Generate "active-ratio histogram" that adjusts the histogram proportionally according to how many bins the detector was "active vs dead"
+intgrl_N = len(t_fine)
 if not include_deadtime:
+    bin_edges = np.linspace(t_min, t_max, intgrl_N + 1, endpoint=False)
+
     active_ratio_hst_fit_LG = torch.ones(len(bin_edges) - 1)
     active_ratio_hst_val_LG = torch.ones(len(bin_edges) - 1)
 
@@ -219,63 +218,21 @@ C_scale_final.append(C_scale_arr[min_order])
 fit_rate_seg = fit_rate_fine[min_order, :]
 
 if not repeat_run:
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
 
-    res_ideal = 2  # [m]
-    dt *= downsamp
-    res = (res_ideal/c*2 // dt) * dt  # [s]
-    bin_avg = int(res / dt)
-    print('Figure Resolution: {} m'.format(res*c/2))
-    bin_array = set_binwidth(t_min, t_max, res)
+    res = dt * downsamp  # [s]
+    print('Processed Resolution: {} m ({} s)'.format(res * c / 2, res))
+    bin_array = set_binwidth(t_min, t_max+res, res)
     n_LG, bins = np.histogram(flight_time_LG, bins=bin_array)
-    n_HG, __ = np.histogram(flight_time_HG, bins=bin_array)
     binwidth = np.diff(bins)[0]
     N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
-    N_HG = n_HG / binwidth / n_shots  # [Hz]
-    # try accomodating for combined high-gain and low-gain signals
     photon_rate_arr = photon_rate_arr_LG / T_BS_LG
-    center = 0.5 * (bins[:-1] + bins[1:])
 
-    muller_res_ideal = 50  # [m]
-    muller_res = (muller_res_ideal/c*2 // dt) * dt  # [s]
-    muller_bin_avg = int(muller_res / dt)
-    print('Muller Resolution: {} m'.format(muller_res*c/2))
-    muller_bin_array = set_binwidth(t_min, t_max, muller_res)
-    n_LG_muller, bins_muller = np.histogram(flight_time_LG, bins=muller_bin_array)
-    n_HG_muller, __ = np.histogram(flight_time_HG, bins=muller_bin_array)
-    binwidth_muller = np.diff(bins_muller)[0]
-    N_LG_muller = n_LG_muller / binwidth_muller / n_shots  # [Hz] Scaling counts to arrival rate
-    N_HG_muller = n_HG_muller / binwidth_muller / n_shots  # [Hz]
-    N_LG_muller = N_LG_muller / (1-deadtime*N_LG_muller)  # [Hz] applying Muller correction
-    N_HG_muller = N_HG_muller / (1-deadtime*N_HG_muller)  # [Hz] applying Muller correction
-    center_muller = 0.5 * (bins_muller[:-1] + bins_muller[1:])
-
-    # ax.bar(center_muller * c / 2, N_HG_muller / 1e6 / 0.424, align='center', width=binwidth_muller*c/2, color='teal', alpha=0.75, label='High gain counts (scaled + Muller)')
-    # ax.bar(center_muller * c / 2, N_LG_muller / 1e6 / 0.022, align='center', width=binwidth_muller*c/2, color='magenta', alpha=0.75, label='Low gain counts (scaled + Muller)')
-    ax.bar(center * c / 2, N_LG / 1e6 / T_BS_LG, align='center', width=binwidth*c/2, color='green', alpha=0.75, label='Low gain counts (scaled)')
-    # ax.bar(center * c / 2, N_HG / 1e6 / 0.95, align='center', width=binwidth*c/2, color='green', alpha=1.0, label='High gain counts (scaled)')
-    ax.bar(center * c / 2, N_HG / 1e6, align='center', width=binwidth * c / 2, color='blue', alpha=0.75, label='High gain counts')
-    ax.bar(center * c / 2, N_LG / 1e6, align='center', width=binwidth * c / 2, color='orange', alpha=0.75, label='Low gain counts')
-    ax.plot(t_fine * c / 2, fit_rate_seg / 1e6, color='r', linestyle='--', label='Fit')
-    ax.plot(t_fine * c / 2, photon_rate_arr / 1e6, color='m', linestyle='--', label='Truth (BS eta)')
-    ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
-    # ax.set_title('Arrival Rate Fit: {}{:.2E}'.format('True Rho = ' if use_sim else 'OD = ', rho_list[k] if use_sim else +OD_list[k]))
-    ax.set_xlabel('Range [m]')
-    ax.set_ylabel('Photon Arrival Rate [MHz]')
-    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-    ax.text(0.1, 0.90, 'Polynomial order: {}'.format(min_order), transform=ax.transAxes, fontsize=14,
-            verticalalignment='top', bbox=props)
-    ax.semilogy()
-    plt.legend()
-    plt.tight_layout()
+    LG_error = np.abs(photon_rate_arr - N_LG / T_BS_LG)  # [Hz] Absolute error with scaled LG histogram
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
-
-    ax.plot(t_fine[int(bin_avg/2):-int(bin_avg/2):bin_avg] * c / 2, np.abs(photon_rate_arr[int(bin_avg/2):-int(bin_avg/2):bin_avg] - N_LG / T_BS_LG), color='green', linestyle='--', label='Scaled LG error')
-    # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_LG_muller/0.022), color='magenta', linestyle='--', label='LG Muller error')
-    # ax.plot(t_fine[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg] * c / 2, np.abs(photon_rate_arr[int(muller_bin_avg/2):-int(muller_bin_avg/2):muller_bin_avg]-N_HG_muller/0.022), color='teal', linestyle='--', label='HG Muller error')
+    ax.plot(t_fine * c / 2, LG_error, color='green', linestyle='--',
+            label='Scaled LG error')
     ax.plot(t_fine * c / 2, np.abs(photon_rate_arr - fit_rate_seg), color='r', linestyle='--', label='Fit error')
     ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
     ax.set_xlabel('Range [m]')
@@ -286,6 +243,37 @@ if not repeat_run:
             verticalalignment='top', bbox=props)
     ax.semilogy()
     ax.set_ylim([1e4, 1e9])
+    plt.legend()
+    plt.tight_layout()
+
+    # Plotting histograms
+    res_plot = 2  # [m]
+    res_plot = int(res_plot/c*2 // dt) * dt  # [s]
+    print('Figure Resolution: {} m ({} s)'.format(res_plot * c / 2, res_plot))
+    bin_array = set_binwidth(t_min, t_max+res_plot, res_plot)
+    n_LG, bins = np.histogram(flight_time_LG, bins=bin_array)
+    n_HG, __ = np.histogram(flight_time_HG, bins=bin_array)
+    binwidth = np.diff(bins)[0]
+    N_LG = n_LG / binwidth / n_shots  # [Hz] Scaling counts to arrival rate
+    N_HG = n_HG / binwidth / n_shots  # [Hz]
+    # try accomodating for combined high-gain and low-gain signals
+    photon_rate_arr = photon_rate_arr_LG / T_BS_LG
+    center = 0.5 * (bins[:-1] + bins[1:])
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.bar(center * c / 2, N_LG / 1e6 / T_BS_LG, align='center', width=binwidth*c/2, color='green', alpha=0.75, label='Low gain counts (scaled)')
+    ax.bar(center * c / 2, N_HG / 1e6, align='center', width=binwidth * c / 2, color='blue', alpha=0.75, label='High gain counts')
+    ax.bar(center * c / 2, N_LG / 1e6, align='center', width=binwidth * c / 2, color='orange', alpha=0.75, label='Low gain counts')
+    ax.plot(t_fine * c / 2, fit_rate_seg / 1e6, color='r', linestyle='--', label='Fit')
+    ax.plot(t_fine * c / 2, photon_rate_arr / 1e6, color='m', linestyle='--', label='Truth (BS eta)')
+    ax.set_title('Arrival-Rate Fit Sim # {}'.format(sim_num))
+    ax.set_xlabel('Range [m]')
+    ax.set_ylabel('Photon Arrival Rate [MHz]')
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    ax.text(0.1, 0.90, 'Polynomial order: {}'.format(min_order), transform=ax.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
+    ax.semilogy()
     plt.legend()
     plt.tight_layout()
 
