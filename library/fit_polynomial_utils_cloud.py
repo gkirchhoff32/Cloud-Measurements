@@ -386,7 +386,7 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
 
         ax.plot(fit_loss_lst, label='Order {}'.format(M))
 
-    return ax, val_loss_arr, fit_rate_fine, coeffs, C_scale_arr
+    return ax, val_loss_arr, fit_rate_fine, coeffs
 
 
 
