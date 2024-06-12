@@ -38,13 +38,13 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 199  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 399  # Maximum number of laser shots for the fit dataset
 include_deadtime = True  # Set TRUE to include deadtime in noise model
 use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 discrete_loss = False  # Set TRUE if using the discrete histogram form of the loss function. Set FALSE if using the time-tag form.
-use_muller = True  # Set TRUE if using Muller correction for deadtime correction. Set FALSE if using Deadtime Correction Technique.
+use_muller = False  # Set TRUE if using Muller correction for deadtime correction. Set FALSE if using Deadtime Correction Technique.
 if use_muller:
     discrete_loss = True
 
