@@ -38,16 +38,16 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 499  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 999  # Maximum number of laser shots for the fit dataset
 include_deadtime = True  # Set TRUE to include deadtime in noise model
 use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
 # repeat_range = np.arange(1, 13)  # If 'repeat_run' is TRUE, these are the indices of the repeat segments (e.g., 'np.arange(1,3)' and 'max_lsr_num_fit=1e2' --> run on 1st-set of 100, then 2nd-set of 100 shots.
 discrete_loss = False  # Set TRUE if using the discrete histogram form of the loss function. Set FALSE if using the time-tag form.
-use_muller = False  # Set TRUE if using Muller correction for deadtime correction. Set FALSE if using Deadtime Correction Technique.
+use_muller = True  # Set TRUE if using Muller correction for deadtime correction. Set FALSE if using Deadtime Correction Technique.
 if use_muller:
     discrete_loss = True
-use_comb_det = 0  # Set 0 for only using low gain channel for fitting. Set 1 for only high gain. Set 2 for combined channels.
+use_comb_det = 2  # Set 0 for only using low gain channel for fitting. Set 1 for only high gain. Set 2 for combined channels.
 
 window_bnd = np.array([975, 1050])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
@@ -64,8 +64,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 15
-M_max = 25
+M_min = 18
+M_max = 24
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -78,8 +78,8 @@ load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\S
 save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 # fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
 
-fname_LG = r'\simnum_0_nshot5.00E+02_useHGFalse_T0.05.nc'
-fname_HG = r'\simnum_0_nshot5.00E+02_useHGTrue_T0.95.nc'
+fname_LG = r'\simnum_5_nshot1.00E+03_useHGFalse_T0.05.nc'
+fname_HG = r'\simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -91,12 +91,12 @@ sim_num = int(fname_LG.split('_')[1])
 #         stop_idx = len(files) - 1
 
 # Save file name for important outputs (to csv and pickle object). These are used by scripts like "plot_eval_loss.ipynb"
-save_csv_file = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det)
-save_csv_file_fit = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_best_fit.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det)
+save_csv_file = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_csv_file_fit = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
 save_dframe_fname = r'\fit_figures\eval_loss_dtime{}_simnum{}_order{}-{}' \
-                     '_shots{:.2E}_usecom{}_best_fit.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det)
-save_dframe_plot_muller = r'\fit_figures\muller_out_simnum{}_downsamp{}_shots{:.2E}_usecom{}.pkl'.format(sim_num, downsamp, max_lsr_num_fit, use_comb_det)
-save_dframe_plot_DCT = r'\fit_figures\DCT_out_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det)
+                     '_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_dframe_plot_muller = r'\fit_figures\muller_out_simnum{}_downsamp{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(sim_num, downsamp, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_dframe_plot_DCT = r'\fit_figures\DCT_out_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
 
 
 ########################################################################################################################

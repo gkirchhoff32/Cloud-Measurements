@@ -32,7 +32,7 @@ use_donovan = False  # Set TRUE if user wants to scale the histogram by using th
 limit_shots = False
 
 # window_bnd = [32e-9, 38e-9]  # [s] Set temporal boundaries for binning
-window_bnd = np.array([850, 1200])  # [m] Set boundaries for binning to exclude outliers
+window_bnd = np.array([900, 1200])  # [m] Set boundaries for binning to exclude outliers
 window_bnd = window_bnd / c * 2  # [s] Convert from range to tof
 dt = 25e-12  # [s] Resolution
 deadtime = 29.1e-9  # [s] Deadtime interval (25ns for sim, 29.1ns for SPCM)
@@ -46,7 +46,7 @@ t_max = window_bnd[1]  # [s]
 if load_netcdf:
     home = str(Path.home())
     data_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\saved_sims'
-    fname = r'\\simnum_0_nshot5.00E+02_useHGTrue_T0.95.nc'
+    fname = r'\\simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
 
     ds = xr.open_dataset(data_dir + fname)
 
@@ -91,7 +91,7 @@ else:
 ### Histogram of time of flight ###
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
-bin_avg = 500
+bin_avg = 2000
 res = dt * bin_avg
 bin_array = set_binwidth(t_min, t_max, res)
 # bin_array = set_binwidth(t_min, t_max, dt)
@@ -103,14 +103,16 @@ print('Number of shots: {}'.format(n_shots))
 if use_donovan:
     N_dono = N / (1 - N*deadtime)
 center = 0.5 * (bins[:-1]+bins[1:])
-ax1.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.75, label='Detections')
+# ax1.bar(center*c/2, N, align='center', width=binwidth*c/2, color='b', alpha=0.75, label='Detections')
+ax1.barh(center*c/2/1e3, N/1e6, align='center', height=binwidth*c/2/1e3, color='b', alpha=0.75)
 if use_donovan:
     ax1.bar(center*c/2, N_dono, align='center', width=binwidth*c/2, color='r', alpha=0.5, label='Muller "Corrected" Profile')
     ax1.set_title('Inaccurate Muller Correction Demonstration')
     plt.legend()
-ax1.set_xlabel('Range [m]')
-ax1.set_ylabel('Arrival rate [Hz]')
-ax1.set_yscale('log')
+ax1.set_ylabel('Range [km]')
+ax1.set_xlabel('Arrival rate [MHz]')
+ax1.set_xscale('log')
+ax1.set_ylim(window_bnd*c/2/1e3)
 plt.tight_layout()
 plt.show()
 
