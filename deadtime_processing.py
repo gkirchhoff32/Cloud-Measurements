@@ -38,7 +38,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = 999  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = 9  # Maximum number of laser shots for the fit dataset
 include_deadtime = True  # Set TRUE to include deadtime in noise model
 use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
@@ -64,8 +64,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 18
-M_max = 24
+M_min = 5
+M_max = 6
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -73,13 +73,22 @@ if not repeat_run:
     repeat_range = np.array([1])
 
 ### PATH VARIABLES ###
-home = str(Path.home())
-load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\saved_sims'  # Where the data is loaded from
-save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
-# fname_ref = r'\OD50_Dev_0_-_2023-03-06_16.56.00_OD5.0.ARSENL.nc'  # The dataset that will serve as the high-fidelity reference when evaluating
+if 'win' in sys.platform:
+    home = str(Path.home())
+elif sys.platform == 'linux':
+    home = r'/mnt/c/Users/Grant'
+else:
+    raise OSError('Check operating system is Windows or Linux')
 
-fname_LG = r'\simnum_5_nshot1.00E+03_useHGFalse_T0.05.nc'
-fname_HG = r'\simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
+# load_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\saved_sims'  # Where the data is loaded from
+load_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'Cloud Measurements', 'Sims', 'saved_sims')
+# save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
+save_dir = os.path.join(load_dir, '..', 'evaluation_loss')
+
+# fname_LG = r'\simnum_5_nshot1.00E+03_useHGFalse_T0.05.nc'
+fname_LG = r'simnum_5_nshot1.00E+03_useHGFalse_T0.05.nc'
+# fname_HG = r'\simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
+fname_HG = r'simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
 sim_num = int(fname_LG.split('_')[1])
 
 # if run_full and use_final_idx:
@@ -91,12 +100,18 @@ sim_num = int(fname_LG.split('_')[1])
 #         stop_idx = len(files) - 1
 
 # Save file name for important outputs (to csv and pickle object). These are used by scripts like "plot_eval_loss.ipynb"
-save_csv_file = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
-save_csv_file_fit = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
-save_dframe_fname = r'\fit_figures\eval_loss_dtime{}_simnum{}_order{}-{}' \
-                     '_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
-save_dframe_plot_muller = r'\fit_figures\muller_out_simnum{}_downsamp{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(sim_num, downsamp, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
-save_dframe_plot_DCT = r'\fit_figures\DCT_out_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+# save_csv_file = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+# save_csv_file_fit = r'\eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+# save_dframe_fname = r'\fit_figures\eval_loss_dtime{}_simnum{}_order{}-{}' \
+#                      '_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+# save_dframe_plot_muller = r'\fit_figures\muller_out_simnum{}_downsamp{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(sim_num, downsamp, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+# save_dframe_plot_DCT = r'\fit_figures\DCT_out_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_csv_file = 'eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_csv_file_fit = 'eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_dframe_fname = os.path.join('fit_figures', 'eval_loss_dtime{}_simnum{}_order{}-{}' \
+                     '_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
+save_dframe_plot_muller = os.path.join('fit_figures', 'muller_out_simnum{}_downsamp{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(sim_num, downsamp, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
+save_dframe_plot_DCT = os.path.join('fit_figures', 'DCT_out_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
 
 
 ########################################################################################################################
@@ -135,7 +150,7 @@ print('Number of detections high gain: {}'.format(len(flight_time_HG)))
 print('Number of laser shots: {}'.format(n_shots))
 
 if use_sim:
-    ds_LG = xr.open_dataset(load_dir + fname_LG)
+    ds_LG = xr.open_dataset(os.path.join(load_dir, fname_LG))
 
     photon_rate_arr_LG = ds_LG.photon_rate_arr.to_numpy()
     og_t_min, og_t_max = ds_LG.t_sim_bins.values[0], ds_LG.t_sim_bins.values[-1]
@@ -250,18 +265,18 @@ if not use_muller:
     headers = ['time vector', 'fit profile']
     df_out = pd.DataFrame(np.array(fit_rate_seg_lst).T.tolist())
     df_out = pd.concat([pd.DataFrame(t_fine), df_out], axis=1)
-    df_out = df_out.to_csv(save_dir + save_csv_file_fit_temp, header=headers)
-
+    # df_out = df_out.to_csv(save_dir + save_csv_file_fit_temp, header=headers)
+    df_out = df_out.to_csv(os.path.join(save_dir, save_csv_file_fit_temp), header=headers)
     dframe = [flight_time_lst_LG, flight_time_lst_HG, t_min, t_max, dt, n_shots, active_ratio_hst_fit_LG, active_ratio_hst_fit_HG]
-    pickle.dump(dframe, open(save_dir+save_dframe_fname_temp, 'wb'))
+    pickle.dump(dframe, open(os.path.join(save_dir, save_dframe_fname_temp), 'wb'))
 
     save_dframe_fname_temp = save_dframe_plot_DCT
     dframe = [discrete_loss, dt, downsamp, t_min, t_max, dt, flight_time_LG, flight_time_HG, n_shots, T_BS_LG, photon_rate_arr_LG, sim_num, t_fine, fit_rate_seg, min_order]
-    pickle.dump(dframe, open(save_dir + save_dframe_fname_temp, 'wb'))
+    pickle.dump(dframe, open(os.path.join(save_dir, save_dframe_fname_temp), 'wb'))
 else:
     save_dframe_fname_temp = save_dframe_plot_muller
     dframe = [dt, downsamp, t_min, t_max, flight_time_LG, flight_time_HG, n_shots, deadtime, T_BS_LG, T_BS_HG, photon_rate_arr_LG, sim_num, t_fine]
-    pickle.dump(dframe, open(save_dir + save_dframe_fname_temp, 'wb'))
+    pickle.dump(dframe, open(os.path.join(save_dir, save_dframe_fname_temp), 'wb'))
 
 ###### Plot figures ######
 if not repeat_run:

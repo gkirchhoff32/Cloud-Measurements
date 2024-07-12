@@ -11,6 +11,8 @@ Histogram photon arrival time data from ARSENL INPHAMIS lidar. IMPORTANT: Set da
 'load_ARSENL_data.py' first.
 """
 
+import sys
+import os
 import numpy as np
 import time
 import pickle
@@ -43,12 +45,20 @@ if limit_shots:
 t_min = window_bnd[0]  # [s]
 t_max = window_bnd[1]  # [s]
 
-if load_netcdf:
-    home = str(Path.home())
-    data_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\saved_sims'
-    fname = r'\\simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
+print(sys.platform)
 
-    ds = xr.open_dataset(data_dir + fname)
+if load_netcdf:
+    if 'win' in sys.platform:
+        home = str(Path.home())
+    elif sys.platform == 'linux':
+        home = r'/mnt/c/Users/Grant'
+    else:
+        raise OSError('Check operating system is Windows or Linux')
+    data_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'Cloud Measurements', 'Sims', 'saved_sims')
+    fname = 'simnum_5_nshot1.00E+03_useHGTrue_T0.95.nc'
+    save_fname = 'histogram.jpg'
+
+    ds = xr.open_dataset(os.path.join(data_dir, fname))
 
     cnts = ds.time_tag
     if limit_shots:
@@ -114,5 +124,8 @@ ax1.set_xlabel('Arrival rate [MHz]')
 ax1.set_xscale('log')
 ax1.set_ylim(window_bnd*c/2/1e3)
 plt.tight_layout()
-plt.show()
+if sys.platform == 'win32':
+    plt.show()
+else:
+    plt.savefig(os.path.join(data_dir, save_fname))
 

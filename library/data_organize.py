@@ -6,6 +6,7 @@
 
 import numpy as np
 import xarray as xr
+import os
 
 def data_organize(dt, data_dir, fname, window_bnd, max_lsr_num, exclude_shots=True, repeat_num=1):
     '''
@@ -24,7 +25,7 @@ def data_organize(dt, data_dir, fname, window_bnd, max_lsr_num, exclude_shots=Tr
     '''
 
     # Load and organize xarray dataset
-    ds = xr.open_dataset(data_dir + fname)
+    ds = xr.open_dataset(os.path.join(data_dir, fname))
 
     # Generate flight time values, sync counts, and sync counter values for each time tag
     cnts = ds.time_tag
