@@ -270,15 +270,6 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         Y_fit_LG = torch.from_numpy(np.histogram(t_phot_fit_tnsr_LG.detach().numpy(), bins=bins)[0])
         Y_val_LG = torch.from_numpy(np.histogram(t_phot_val_tnsr_LG.detach().numpy(), bins=bins)[0])
 
-    if use_com_det == 1 or use_com_det == 2:
-        T_BS_HG = T_BS[1]
-        eta_HG = T_BS_HG
-        t_phot_fit_tnsr_HG, t_phot_val_tnsr_HG = t_phot_fit_tnsr[1], t_phot_val_tnsr[1]
-        active_ratio_hst_fit_HG, active_ratio_hst_val_HG = active_ratio_hst_fit[1], active_ratio_hst_val[1]
-        n_shots_fit_HG, n_shots_val_HG = n_shots_fit[1], n_shots_val[1]
-        Y_fit_HG = torch.from_numpy(np.histogram(t_phot_fit_tnsr_HG.detach().numpy(), bins=bins)[0])
-        Y_val_HG = torch.from_numpy(np.histogram(t_phot_val_tnsr_HG.detach().numpy(), bins=bins)[0])
-
     fig = plt.figure()
     ax = fig.add_subplot(111)
     # Iterate through increasing polynomial complexity.
@@ -305,12 +296,8 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
 
         # perform fit
         start = time.time()
-        if use_com_det == 0 or use_com_det == 2:
-            t_fit_norm_LG = fit_model.tstamp_condition(t_phot_fit_tnsr_LG, t_min, t_max)
-            t_val_norm_LG = fit_model.tstamp_condition(t_phot_val_tnsr_LG, t_min, t_max)
-        if use_com_det == 1 or use_com_det == 2:
-            t_fit_norm_HG = fit_model.tstamp_condition(t_phot_fit_tnsr_HG, t_min, t_max)
-            t_val_norm_HG = fit_model.tstamp_condition(t_phot_val_tnsr_HG, t_min, t_max)
+        t_fit_norm_LG = fit_model.tstamp_condition(t_phot_fit_tnsr_LG, t_min, t_max)
+        t_val_norm_LG = fit_model.tstamp_condition(t_phot_val_tnsr_LG, t_min, t_max)
 
         t_intgrl = cheby_poly(torch.linspace(0, 1, intgrl_N), M)
         while rel_step > rel_step_lim and epoch < max_epochs:
@@ -319,23 +306,17 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
                 if use_com_det == 0 or use_com_det == 1:
                     fine_res_model_fit_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
                     loss_fit_LG = loss_fn(fine_res_model_fit_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
-                if use_com_det == 1 or use_com_det == 2:
-                    fine_res_model_fit_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
-                    loss_fit_HG = loss_fn(fine_res_model_fit_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
             else:
                 if use_com_det == 0 or use_com_det == 2:
                     pred_fit_LG, integral_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
                     loss_fit_LG = loss_fn(pred_fit_LG, integral_LG, n_shots_fit_LG, eta_LG)
-                if use_com_det == 1 or use_com_det == 2:
-                    pred_fit_HG, integral_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
-                    loss_fit_HG = loss_fn(pred_fit_HG, integral_HG, n_shots_fit_HG, eta_HG)
 
             if use_com_det == 0:
                 loss_fit = loss_fit_LG
-            elif use_com_det == 1:
-                loss_fit = loss_fit_HG
-            elif use_com_det == 2:
-                loss_fit = loss_fit_LG/torch.sum(Y_fit_LG) + loss_fit_HG/torch.sum(Y_fit_HG)
+            # elif use_com_det == 1:
+            #     loss_fit = loss_fit_HG
+            # elif use_com_det == 2:
+            #     loss_fit = loss_fit_LG/torch.sum(Y_fit_LG) + loss_fit_HG/torch.sum(Y_fit_HG)
 
             fit_loss_lst += [loss_fit.item()]
 
@@ -364,41 +345,18 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         # Calculate validation loss
         # Using fit generated from fit set, calculate loss when applied to validation set
         if discrete_loss:
-            if use_com_det == 0 or use_com_det == 2:
-                fine_res_model_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, discrete_loss, cheby=True)
-                loss_val_LG = loss_fn(fine_res_model_val_LG, eta_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
-            if use_com_det == 1 or use_com_det == 2:
-                fine_res_model_val_HG, __ = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, discrete_loss, cheby=True)
-                loss_val_HG = loss_fn(fine_res_model_val_HG, eta_HG, active_ratio_hst_val_HG, dt, Y_val_HG, n_shots_val_HG)  # add regularization here
+            fine_res_model_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, discrete_loss, cheby=True)
+            loss_val_LG = loss_fn(fine_res_model_val_LG, eta_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
         else:
-            if use_com_det == 0 or use_com_det == 2:
-                pred_val_LG, integral_val_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
-                loss_val_LG = loss_fn(pred_val_LG, integral_val_LG, n_shots_val_LG, eta_LG)
-            if use_com_det == 1 or use_com_det == 2:
-                pred_val_HG, integral_val_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
-                loss_val_HG = loss_fn(pred_val_HG, integral_val_HG, n_shots_val_HG, eta_HG)
+            pred_val_LG, integral_val_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
+            loss_val_LG = loss_fn(pred_val_LG, integral_val_LG, n_shots_val_LG, eta_LG)
 
-        if use_com_det == 0:
-            loss_fit = loss_val_LG
-        elif use_com_det == 1:
-            loss_fit = loss_val_HG
-        elif use_com_det == 2:
-            loss_fit = loss_val_LG/torch.sum(Y_val_LG) + loss_val_HG/torch.sum(Y_val_HG)
+        loss_fit = loss_val_LG
+        # elif use_com_det == 1:
+        #     loss_fit = loss_val_HG
+        # elif use_com_det == 2:
+        #     loss_fit = loss_val_LG/torch.sum(Y_val_LG) + loss_val_HG/torch.sum(Y_val_HG)
         val_loss_arr[M] = loss_fit
-
-        # Now use the generated fit and calculate loss against evaluation set (e.g., no deadtime, high-OD data)
-        # When evaluating, I don't want to use the deadtime model as my evaluation metric. So I will use the Poisson loss function.
-        # To accommodate, I will remove the active_ratio_hst_ref which is what incorporates the deadtime.
-
-        # pred_eval, integral_eval = fit_model(intgrl_N, torch.ones(len(active_ratio_hst_ref)), t_eval_norm, t_N_eval, t_intgrl, cheby=True)
-
-        # If the number of shots between evaluation set and validation set differ, then arrival rate needs to be scaled accordingly.
-        # Refer to Grant's notes for the derivation of this rescaling expression
-        # n_det_eval = len(pred_eval)
-        # C_scale = n_det_eval / n_shots_eval / integral_eval
-        # loss_eval = loss_fn(C_scale * pred_eval, C_scale * integral_eval * torch.tensor(n_shots_eval))
-        # eval_loss_arr[M] = loss_eval
-        # C_scale_arr[M] = C_scale
 
         end = time.time()
         print('Order={}: {:.2f} sec'.format(M, end - start))

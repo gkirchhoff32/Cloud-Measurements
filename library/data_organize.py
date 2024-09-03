@@ -36,7 +36,7 @@ def data_organize(dt, data_dir, fname, window_bnd, max_lsr_num, exclude_shots=Tr
     ttag_sync_idx = ds.time_tag_sync_index.values
     ttag_sync_idx = ttag_sync_idx[valid_idx]
     lsr_shot_cntr = ds.sync_index.to_numpy()
-    T_BS = ds.T_BS.values.item()  # transmission for the specific high-gain or low-gain channel
+    # T_BS = ds.T_BS.values.item()  # transmission for the specific high-gain or low-gain channel
 
     if exclude_shots:
         # Obtain sync index corresponding to maximum laser shot number specified by user. If the exact index doesn't
@@ -82,4 +82,4 @@ def data_organize(dt, data_dir, fname, window_bnd, max_lsr_num, exclude_shots=Tr
         else:
             t_det_lst.append(total_det)
 
-    return flight_time, n_shots, t_det_lst, T_BS
+    return flight_time, n_shots, t_det_lst
