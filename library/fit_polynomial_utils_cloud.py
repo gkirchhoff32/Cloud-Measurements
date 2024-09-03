@@ -253,6 +253,7 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
                 rel_step_lim=1e-8, intgrl_N=10000, max_epochs=4000, term_persist=20):
 
     t_min, t_max = t_fine[0], t_fine[-1]
+    bins = np.append(t_fine, t_fine[-1] + np.diff(t_fine)[0])
 
     val_loss_arr = np.full(M_max+1, np.nan)
     coeffs = np.zeros((M_max+1, M_max+1))
@@ -260,22 +261,23 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
     C_scale_arr = np.zeros(M_max+1)
     print('Time elapsed:\n')
 
-    T_BS_LG, T_BS_HG = T_BS[0], T_BS[1]
-    eta_LG = T_BS_LG
-    eta_HG = T_BS_HG
+    if use_com_det == 0 or use_com_det == 2:
+        T_BS_LG = T_BS[0]
+        eta_LG = T_BS_LG
+        t_phot_fit_tnsr_LG, t_phot_val_tnsr_LG = t_phot_fit_tnsr[0], t_phot_val_tnsr[0]
+        active_ratio_hst_fit_LG, active_ratio_hst_val_LG = active_ratio_hst_fit[0], active_ratio_hst_val[0]
+        n_shots_fit_LG, n_shots_val_LG = n_shots_fit[0], n_shots_val[0]
+        Y_fit_LG = torch.from_numpy(np.histogram(t_phot_fit_tnsr_LG.detach().numpy(), bins=bins)[0])
+        Y_val_LG = torch.from_numpy(np.histogram(t_phot_val_tnsr_LG.detach().numpy(), bins=bins)[0])
 
-    t_phot_fit_tnsr_LG, t_phot_fit_tnsr_HG = t_phot_fit_tnsr[0], t_phot_fit_tnsr[1]
-    t_phot_val_tnsr_LG, t_phot_val_tnsr_HG = t_phot_val_tnsr[0], t_phot_val_tnsr[1]
-    active_ratio_hst_fit_LG, active_ratio_hst_fit_HG = active_ratio_hst_fit[0], active_ratio_hst_fit[1]
-    active_ratio_hst_val_LG, active_ratio_hst_val_HG = active_ratio_hst_val[0], active_ratio_hst_val[1]
-    n_shots_fit_LG, n_shots_fit_HG = n_shots_fit[0], n_shots_fit[1]
-    n_shots_val_LG, n_shots_val_HG = n_shots_val[0], n_shots_val[1]
-
-    bins = np.append(t_fine, t_fine[-1] + np.diff(t_fine)[0])
-    Y_fit_LG = torch.from_numpy(np.histogram(t_phot_fit_tnsr_LG.detach().numpy(), bins=bins)[0])
-    Y_fit_HG = torch.from_numpy(np.histogram(t_phot_fit_tnsr_HG.detach().numpy(), bins=bins)[0])
-    Y_val_LG = torch.from_numpy(np.histogram(t_phot_val_tnsr_LG.detach().numpy(), bins=bins)[0])
-    Y_val_HG = torch.from_numpy(np.histogram(t_phot_val_tnsr_HG.detach().numpy(), bins=bins)[0])
+    if use_com_det == 1 or use_com_det == 2:
+        T_BS_HG = T_BS[1]
+        eta_HG = T_BS_HG
+        t_phot_fit_tnsr_HG, t_phot_val_tnsr_HG = t_phot_fit_tnsr[1], t_phot_val_tnsr[1]
+        active_ratio_hst_fit_HG, active_ratio_hst_val_HG = active_ratio_hst_fit[1], active_ratio_hst_val[1]
+        n_shots_fit_HG, n_shots_val_HG = n_shots_fit[1], n_shots_val[1]
+        Y_fit_HG = torch.from_numpy(np.histogram(t_phot_fit_tnsr_HG.detach().numpy(), bins=bins)[0])
+        Y_val_HG = torch.from_numpy(np.histogram(t_phot_val_tnsr_HG.detach().numpy(), bins=bins)[0])
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -303,24 +305,30 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
 
         # perform fit
         start = time.time()
-        t_fit_norm_LG = fit_model.tstamp_condition(t_phot_fit_tnsr_LG, t_min, t_max)
-        t_fit_norm_HG = fit_model.tstamp_condition(t_phot_fit_tnsr_HG, t_min, t_max)
-        t_val_norm_LG = fit_model.tstamp_condition(t_phot_val_tnsr_LG, t_min, t_max)
-        t_val_norm_HG = fit_model.tstamp_condition(t_phot_val_tnsr_HG, t_min, t_max)
+        if use_com_det == 0 or use_com_det == 2:
+            t_fit_norm_LG = fit_model.tstamp_condition(t_phot_fit_tnsr_LG, t_min, t_max)
+            t_val_norm_LG = fit_model.tstamp_condition(t_phot_val_tnsr_LG, t_min, t_max)
+        if use_com_det == 1 or use_com_det == 2:
+            t_fit_norm_HG = fit_model.tstamp_condition(t_phot_fit_tnsr_HG, t_min, t_max)
+            t_val_norm_HG = fit_model.tstamp_condition(t_phot_val_tnsr_HG, t_min, t_max)
 
         t_intgrl = cheby_poly(torch.linspace(0, 1, intgrl_N), M)
         while rel_step > rel_step_lim and epoch < max_epochs:
             fit_model.train()
             if discrete_loss:
-                fine_res_model_fit_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
-                fine_res_model_fit_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
-                loss_fit_LG = loss_fn(fine_res_model_fit_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
-                loss_fit_HG = loss_fn(fine_res_model_fit_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
+                if use_com_det == 0 or use_com_det == 1:
+                    fine_res_model_fit_LG, dt = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
+                    loss_fit_LG = loss_fn(fine_res_model_fit_LG, eta_LG, active_ratio_hst_fit_LG, dt, Y_fit_LG, n_shots_fit_LG)  # add regularization here
+                if use_com_det == 1 or use_com_det == 2:
+                    fine_res_model_fit_HG, __ = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
+                    loss_fit_HG = loss_fn(fine_res_model_fit_HG, eta_HG, active_ratio_hst_fit_HG, dt, Y_fit_HG, n_shots_fit_HG)  # add regularization here
             else:
-                pred_fit_LG, integral_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
-                pred_fit_HG, integral_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
-                loss_fit_LG = loss_fn(pred_fit_LG, integral_LG, n_shots_fit_LG, eta_LG)
-                loss_fit_HG = loss_fn(pred_fit_HG, integral_HG, n_shots_fit_HG, eta_HG)
+                if use_com_det == 0 or use_com_det == 2:
+                    pred_fit_LG, integral_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
+                    loss_fit_LG = loss_fn(pred_fit_LG, integral_LG, n_shots_fit_LG, eta_LG)
+                if use_com_det == 1 or use_com_det == 2:
+                    pred_fit_HG, integral_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
+                    loss_fit_HG = loss_fn(pred_fit_HG, integral_HG, n_shots_fit_HG, eta_HG)
 
             if use_com_det == 0:
                 loss_fit = loss_fit_LG
@@ -356,15 +364,19 @@ def optimize_fit(M_max, M_lst, t_fine, t_phot_fit_tnsr, t_phot_val_tnsr, active_
         # Calculate validation loss
         # Using fit generated from fit set, calculate loss when applied to validation set
         if discrete_loss:
-            fine_res_model_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, discrete_loss, cheby=True)
-            fine_res_model_val_HG, __ = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, discrete_loss, cheby=True)
-            loss_val_LG = loss_fn(fine_res_model_val_LG, eta_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
-            loss_val_HG = loss_fn(fine_res_model_val_HG, eta_HG, active_ratio_hst_val_HG, dt, Y_val_HG, n_shots_val_HG)  # add regularization here
+            if use_com_det == 0 or use_com_det == 2:
+                fine_res_model_val_LG, dt = fit_model(intgrl_N, active_ratio_hst_val_LG, t_val_norm_LG, t_intgrl, discrete_loss, cheby=True)
+                loss_val_LG = loss_fn(fine_res_model_val_LG, eta_LG, active_ratio_hst_val_LG, dt, Y_val_LG, n_shots_val_LG)  # add regularization here
+            if use_com_det == 1 or use_com_det == 2:
+                fine_res_model_val_HG, __ = fit_model(intgrl_N, active_ratio_hst_val_HG, t_val_norm_HG, t_intgrl, discrete_loss, cheby=True)
+                loss_val_HG = loss_fn(fine_res_model_val_HG, eta_HG, active_ratio_hst_val_HG, dt, Y_val_HG, n_shots_val_HG)  # add regularization here
         else:
-            pred_val_LG, integral_val_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
-            pred_val_HG, integral_val_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
-            loss_val_LG = loss_fn(pred_val_LG, integral_val_LG, n_shots_val_LG, eta_LG)
-            loss_val_HG = loss_fn(pred_val_HG, integral_val_HG, n_shots_val_HG, eta_HG)
+            if use_com_det == 0 or use_com_det == 2:
+                pred_val_LG, integral_val_LG = fit_model(intgrl_N, active_ratio_hst_fit_LG, t_fit_norm_LG, t_intgrl, discrete_loss, cheby=True)
+                loss_val_LG = loss_fn(pred_val_LG, integral_val_LG, n_shots_val_LG, eta_LG)
+            if use_com_det == 1 or use_com_det == 2:
+                pred_val_HG, integral_val_HG = fit_model(intgrl_N, active_ratio_hst_fit_HG, t_fit_norm_HG, t_intgrl, discrete_loss, cheby=True)
+                loss_val_HG = loss_fn(pred_val_HG, integral_val_HG, n_shots_val_HG, eta_HG)
 
         if use_com_det == 0:
             loss_fit = loss_val_LG
