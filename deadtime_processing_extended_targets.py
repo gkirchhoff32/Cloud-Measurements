@@ -39,7 +39,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = int(1e4)  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = int(1e6)  # Maximum number of laser shots for the fit dataset
 include_deadtime = True  # Set TRUE to include deadtime in noise model
 use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
@@ -57,7 +57,6 @@ if use_sim:
     deadtime = 25e-9  # [s]
 else:
     deadtime = 29.1e-9  # [s]
-# dt = 25e-12  # [s] TCSPC resolution
 downsamp = 1  # downsample factor for processing (not when plotting histograms)
 # downsamp_hist = True  # set TRUE if averaging histograms for ONLY the plotting
 
@@ -70,7 +69,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 5
-M_max = 18
+M_max = 15
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -91,7 +90,7 @@ load_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'S
 # save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 save_dir = os.path.join(load_dir, '..', 'evaluation_loss')
 
-fname_LG = r'sim_amp1.2E+09_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
+fname_LG = r'sim_amp6.0E+08_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
 sim_num = 1
 
 if use_sim:
@@ -104,7 +103,10 @@ if use_sim:
     window_bnd = ds_LG.window_bnd.values  # simulated window [s]
     dt_sim = ds_LG.dt_sim.values  # [s] simulation resolution
 
-    og_t_fine = np.arange(window_bnd[0], window_bnd[1], dt_sim)
+    if discrete_loss:
+        og_t_fine = np.arange(window_bnd[0], window_bnd[1], dt_sim*downsamp)
+    else:
+        og_t_fine = np.arange(window_bnd[0], window_bnd[1], dt_sim)
     photon_rate_arr = A * np.exp(-(og_t_fine-mu)**2/2/sigma**2) + bg  # [Hz] true arrival rate
 
     dt = dt_sim  # [s]
@@ -283,6 +285,8 @@ if not repeat_run:
         use_bins = True
         if use_bins:
             dsamp = 1  # number of bins to downsample when plotting
+            if discrete_loss:
+                dsamp = downsamp
             res_plot = dt * dsamp
         else:
             res_plot = 2  # [m]
