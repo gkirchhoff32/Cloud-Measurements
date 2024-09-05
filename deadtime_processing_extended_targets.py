@@ -39,7 +39,7 @@ c = 2.99792458e8  # [m/s] Speed of light
 # EDIT THESE PARAMETERS BEFORE RUNNING!
 ### PARAMETERS ###
 exclude_shots = True  # Set TRUE to exclude data to work with smaller dataset (enables 'max_lsr_num_fit_ref' variables)
-max_lsr_num_fit = int(1e3)  # Maximum number of laser shots for the fit dataset
+max_lsr_num_fit = int(1e4)  # Maximum number of laser shots for the fit dataset
 include_deadtime = True  # Set TRUE to include deadtime in noise model
 use_sim = True  # Set TRUE if using simulated data
 repeat_run = False  # Set TRUE if repeating processing with same parameters but with different data subsets (e.g., fit number is 1e3 and processing first 1e3 dataset, then next 1e3 dataset, etc.)
@@ -70,7 +70,7 @@ term_persist = 20  # relative step size averaging interval in iterations
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
 M_min = 5
-M_max = 6
+M_max = 18
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -91,7 +91,7 @@ load_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'S
 # save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 save_dir = os.path.join(load_dir, '..', 'evaluation_loss')
 
-fname_LG = r'sim_amp1.0E+08_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
+fname_LG = r'sim_amp1.2E+09_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
 sim_num = 1
 
 if use_sim:

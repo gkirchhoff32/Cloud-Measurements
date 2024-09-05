@@ -167,7 +167,7 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
     """
 
     # Initialize
-    bin_edges, dt = np.linspace(t_min, t_max, intgrl_N+1, endpoint=False, retstep=True)
+    bin_edges, dt = np.linspace(t_min, t_max, intgrl_N+1, endpoint=True, retstep=True)
     active_ratio_hst = n_shots * np.ones(len(bin_edges)-1)
     deadtime_n_bins = np.floor(deadtime / dt).astype(int)  # Number of bins that deadtime occupies
 
@@ -194,10 +194,18 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
                 # If initial dead bin (detection bin) precedes fit window, set it to the window lower bin
                 if det_time < t_min:
                     det_bin_idx = 0
-                active_ratio_hst[det_bin_idx:final_dead_bin+1] -= 1  # Remove "dead" region in active ratio
+                active_ratio_hst[det_bin_idx:final_dead_bin] -= 1  # Remove "dead" region in active ratio
 
     # active_ratio_hst /= len(t_det_lst)  # Normalize for ratio
     active_ratio_hst /= n_shots  # Normalize for ratio
+
+    # fig = plt.figure(figsize=(8, 4), dpi=400)
+    # ax = fig.add_subplot(111)
+    # ax.plot(bin_edges[:-1]*3e8/2, active_ratio_hst)
+    # ax.set_xlabel('Range [m]')
+    # ax.set_ylabel('AF Histogram')
+    # plt.show()
+    # quit()
 
     return torch.tensor(active_ratio_hst)
 
