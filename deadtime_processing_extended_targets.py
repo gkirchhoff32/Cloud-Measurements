@@ -68,8 +68,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 5
-M_max = 15
+M_min = 15
+M_max = 17
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -90,7 +90,7 @@ load_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'S
 # save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 save_dir = os.path.join(load_dir, '..', 'evaluation_loss')
 
-fname_LG = r'sim_amp6.0E+08_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
+fname_LG = r'sim_amp1.0E+08_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
 sim_num = 1
 
 if use_sim:
