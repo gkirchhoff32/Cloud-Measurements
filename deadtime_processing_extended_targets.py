@@ -68,8 +68,8 @@ term_persist = 20  # relative step size averaging interval in iterations
 
 # Polynomial orders (min and max) to be iterated over in specified step size in the optimizer
 # Example: Min order 7 and Max order 10 would iterate over orders 7, 8, and 9
-M_min = 15
-M_max = 17
+M_min = 2
+M_max = 3
 step = 1
 M_lst = np.arange(M_min, M_max, step)
 
@@ -90,7 +90,7 @@ load_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'S
 # save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 save_dir = os.path.join(load_dir, '..', 'evaluation_loss')
 
-fname_LG = r'sim_amp1.0E+08_nshot1.0E+06_width5.0E-08_dt2.5E-09.nc'
+fname_LG = r'sim_amp1.2E+09_nshot1.0E+06_width5.0E-10_dt2.5E-11.nc'
 sim_num = 1
 
 if use_sim:
@@ -112,12 +112,12 @@ if use_sim:
     dt = dt_sim  # [s]
 
 # Save file name for important outputs (to csv and pickle object). These are used by scripts like "plot_eval_loss.ipynb"
-save_csv_file = 'eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
-save_csv_file_fit = 'eval_loss_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.csv'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
-save_dframe_fname = os.path.join('fit_figures', 'eval_loss_dtime{}_simnum{}_order{}-{}' \
-                     '_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
-save_dframe_plot_muller = os.path.join('fit_figures', 'muller_out_simnum{}_downsamp{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(sim_num, downsamp, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
-save_dframe_plot_DCT = os.path.join('fit_figures', 'DCT_out_dtime{}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(include_deadtime, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
+save_csv_file = 'eval_loss_dtime{}_peak{:.2E}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.csv'.format(include_deadtime, A, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_csv_file_fit = 'eval_loss_dtime{}_peak{:.2E}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.csv'.format(include_deadtime, A, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2)
+save_dframe_fname = os.path.join('fit_figures', 'eval_loss_dtime{}_peak{:.2E}_simnum{}_order{}-{}' \
+                     '_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}_best_fit.pkl'.format(include_deadtime, A, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
+save_dframe_plot_muller = os.path.join('fit_figures', 'muller_out_peak{:.2E}_simnum{}_downsamp{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(A, sim_num, downsamp, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
+save_dframe_plot_DCT = os.path.join('fit_figures', 'DCT_out_dtime{}_peak{:.2E}_simnum{}_order{}-{}_shots{:.2E}_usecom{}_range{:.0f}-{:.0f}.pkl'.format(include_deadtime, A, sim_num, M_min, M_max-1, max_lsr_num_fit, use_comb_det, window_bnd[0]*c/2, window_bnd[1]*c/2))
 
 
 ########################################################################################################################
@@ -140,7 +140,6 @@ fit_rate_seg_lst = []
 flight_time_lst_LG = []
 active_ratio_hst_lst = []
 
-# Obtain the OD value from the file name. Follow the README guide to ascertain the file naming convention
 flight_time_LG, n_shots, t_det_lst_LG = dorg.data_organize(dt, load_dir, fname_LG, window_bnd, max_lsr_num_fit-1, exclude_shots)
 flight_time_LG = flight_time_LG.values
 num_det_LG = len(flight_time_LG)

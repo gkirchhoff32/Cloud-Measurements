@@ -240,8 +240,8 @@ def generate_fit_val(data, t_det_lst, n_shots):
     # Adjust number of laser shots corresponding to fit and val sets
     ratio_fit_split = len(t_phot_fit) / len(data)
     ratio_val_split = len(t_phot_val) / len(data)
-    n_shots_fit = np.floor(n_shots * ratio_fit_split).astype(int)
-    n_shots_val = np.floor(n_shots * ratio_val_split).astype(int)
+    n_shots_fit = round(n_shots * ratio_fit_split)
+    n_shots_val = round(n_shots * ratio_val_split)
     # n_shots_eval = n_shots_ref
 
     if isinstance(t_phot_fit, np.ndarray):
