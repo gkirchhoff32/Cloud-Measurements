@@ -90,7 +90,7 @@ load_dir = os.path.join(home, 'OneDrive - UCB-O365', 'ARSENL', 'Experiments', 'S
 # save_dir = load_dir + r'\..\evaluation_loss'  # Where the evaluation loss outputs will be saved
 save_dir = os.path.join(load_dir, '..', 'evaluation_loss')
 
-fname_LG = r'sim_amp1.2E+09_nshot1.0E+06_width5.0E-10_dt2.5E-11.nc'
+fname_LG = r'sim_amp1.2E+09_nshot1.0E+06_width2.5E-09_dt1.3E-10.nc'
 sim_num = 1
 
 if use_sim:
