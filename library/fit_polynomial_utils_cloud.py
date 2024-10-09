@@ -207,7 +207,7 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
     # plt.show()
     # quit()
 
-    return torch.tensor(active_ratio_hst)
+    return torch.tensor(active_ratio_hst), bin_edges
 
 def generate_fit_val(data, t_det_lst, n_shots):
     """
