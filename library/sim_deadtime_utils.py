@@ -316,7 +316,7 @@ def split_timetag_array(timetags,lasershot,totalshots=None):
 def split_hist_timetag_array(timetags:np.ndarray,
         lasershot:np.ndarray,laser_shot_time:np.ndarray,
         range_bins:np.ndarray,shot_time_bins:np.ndarray,
-        tD:np.float,wrap:bool=True,n_thin:int=1,verbose:bool=False)->List[List[np.ndarray]]:
+        tD:float,wrap:bool=True,n_thin:int=1,verbose:bool=False)->List[List[np.ndarray]]:
     """
     create a gridded histogram from time tags
     inputs:
