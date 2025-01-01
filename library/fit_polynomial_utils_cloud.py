@@ -169,7 +169,7 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
     # Initialize
     bin_edges, dt = np.linspace(t_min, t_max, intgrl_N+1, endpoint=True, retstep=True)
     active_ratio_hst = n_shots * np.ones(len(bin_edges)-1)
-    deadtime_n_bins = np.floor(deadtime / dt).astype(int)  # Number of bins that deadtime occupies
+    deadtime_n_bins = np.ceil(deadtime / dt).astype(int)  # Number of bins that deadtime occupies
 
     # Iterate through each shot. For each detection event, reduce the number of active bins according to deadtime length.
     for shot in range(len(t_det_lst)):
@@ -182,7 +182,7 @@ def deadtime_noise_hist(t_min, t_max, intgrl_N, deadtime, t_det_lst, n_shots):
             if det_time >= (t_min-deadtime) and det_time <= t_max:
                 det_bin_idx = np.argmin(abs(det_time - bin_edges))  # Bin that detection falls into
                 if det_time < t_min:
-                    deadtime_n_bins_adjusted = deadtime_n_bins - np.floor(t_min-det_time / dt).astype(int)
+                    deadtime_n_bins_adjusted = deadtime_n_bins - np.ceil(t_min-det_time / dt).astype(int)
                     final_dead_bin = det_bin_idx + deadtime_n_bins_adjusted
                 else:
                     final_dead_bin = det_bin_idx + deadtime_n_bins  # Final bin index that deadtime occupies
