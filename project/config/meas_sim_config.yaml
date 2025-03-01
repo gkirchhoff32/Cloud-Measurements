@@ -1,0 +1,38 @@
+constants:
+  c: 299792458  # [m/s] speed of light
+  k_B: 1.380649e-23  # [m^2 kg s-2 K-1]
+  g_0: 9.81  # [m s-2] Gravity
+  M_air: 28.97  # [g/mol] Molar mass of air
+  R_0: 8.314459  # [J/mol/K] Universal gas constant
+  N_A: 6.022e23  # [atoms / mol] Avogadro's number
+  h: 6.626e-34  # [J s] Planck's constant
+
+params:
+  L: 9e-3  # [K/km] Temperature lapse rate for Denver
+  P_0: 840  # [mbar] Typical absolute pressure for Denver
+  T_0: 294.3  # [K] Typical 70 F temperature for Denver
+  lamb: 532.18e-9  # [m] laser wavelength
+
+  D: 8  # [in] outer diameter of telescope
+  d: 1.8  # [in] inner diameter of telescope
+
+  dt_TCSPC: 25e-12  # [s] native resolution of TCSPC
+
+  # Laser specs
+  P_L: 35e-3  # [W] average laser power
+  dt_L: 700e-12  # [s] laser pulse FWHM
+  f_L: 14.7e3  # [Hz] rep rate
+
+  # Receiver specs (at 532 nm)
+  R_tele: 0.95  # Telescope reflectance
+  R_M: 0.99  # Folding mirror reflectance
+  T_L: 0.9  # Standard lens transmittance
+  mu_F: 0.994  # [m-1] Fiber transmission coefficient
+  L_F: 2  # [m] Fiber length
+  T_F: mu_F * L_F  # Fiber transmittance
+  T_FC: T_L  # Fiber coupler transmittance
+  T_BS_LG: 0.05  # Beam-splitter low-gain transmittance
+  T_BS_HG: 0.95  # Beam-splitter high-gain transmittance
+  T_SBF: 0.9  # Solar background filter transmittance
+  eta_QE: 0.5  # Detector quantum efficiency
+  loss: 10  # Unaccounted loss term
