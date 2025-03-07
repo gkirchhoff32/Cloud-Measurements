@@ -32,6 +32,10 @@ picklename = 'pickle.dat'
 create_csv = False
 
 def load_config(file_path):
+    """
+    Loads constants and parameters from configuration .yaml file.
+    :param file_path: path where .yaml is store [str]
+    """
     with open(file_path, "r") as file:
         config = yaml.safe_load(file)
     return config
