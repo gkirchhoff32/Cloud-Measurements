@@ -73,6 +73,7 @@ detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
 rollover_idx = np.where(detect_times_rel < 0)[0]
 detect_times_rel[rollover_idx] += UNWRAP_MODULO
 print(np.where(detect_times_rel<0)[0])
+print(np.max(detect_times_rel)*25/1e12*3e8/2)
 # print()
 
 quit()
