@@ -29,8 +29,8 @@ UNWRAP_MODULO = 33554431  # max clock count rate 2^25-1
 create_csv = False  # Set TRUE to generate a .csv from .ARSENL data
 load_data = True  # Set TRUE to load data into a DataFrame and serialize into a pickle object
 #exclude = [27500, 33500]  # [ps] Set temporal boundaries for binning
-exclude = [0, 70e6]  # [ps] temporal binning bounds
-binsize = 12e-8  # [s] bin width for plotting
+exclude = [0, 70e-6]  # [s] temporal binning bounds
+binsize = 120e-9  # [s] bin width for plotting
 
 # Load INPHAMIS .ARSENL data if not yet serialized
 if load_data:
@@ -69,14 +69,50 @@ remainder = detect.index[-1] - sync_idx[-1]
 counts = np.append(counts, remainder)
 sync_ref = np.repeat(sync_times, counts)
 
+# detect_times_rel = detect_times.sub(sync_ref)
+# print(detect_times_rel)
 detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
 rollover_idx = np.where(detect_times_rel < 0)[0]
 detect_times_rel[rollover_idx] += UNWRAP_MODULO
-print(np.where(detect_times_rel<0)[0])
-print(np.max(detect_times_rel)*25/1e12*3e8/2)
-# print()
 
-quit()
+# # Divide up into columns per shot
+# # Find number of seconds
+# n_sec = len(sync) // 14300  # number of full seconds acquired
+# det_2d_array = []
+# sync_shot_idx = np.zeros(n_sec+1)
+# for i in range(n_sec):
+#     idx_i = 14300 * (i+1)
+#     sync_idx_i = sync_idx[idx_i]
+#     sync_shot_idx[i+1] = sync_idx_i
+#     val_det_idx = (detect.index>sync_shot_idx[i]) & (detect.index<sync_shot_idx[i+1])
+#     print(val_det_idx)
+#     quit()
+# quit()
+
+flight_time = detect_times_rel * 25e-12  # [s] counts were in 25 ps increments
+distance = flight_time * c / 2  # [m]
+
+### Histogram of time of flight ###
+fig = plt.figure()
+ax1 = fig.add_subplot(111)
+bin_array = set_binwidth(exclude[0], exclude[1], binsize)
+n, bins = np.histogram(flight_time, bins=bin_array)
+print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
+binwidth = np.diff(bins)[0]  # [s]
+binwidth_range = binwidth * c / 2  # [m]
+flux = n / binwidth / n_shots  # [Hz]
+center = 0.5 * (bins[:-1]+bins[1:])  # [s]
+center_range = center * c / 2  # [m]
+ax1.barh(center_range/1e3, flux, align='center', height=binwidth_range/1e3, color='b', alpha=0.75)
+ax1.set_ylabel('Range [km]')
+ax1.set_xlabel('Arrival rate [Hz]')
+# ax1.set_xlim([0, 60])
+ax1.set_title('CoBaLT backscatter')
+ax1.set_xscale('log')
+plt.tight_layout()
+plt.show()
+
+
 
 # for i in rollover.index:
 #     cnt += 1
@@ -95,30 +131,30 @@ quit()
 
 
 
-sync_detect_idx = np.array(detect.index) - 1  # Extract index immediately prior to detection event to match with laser pulse
-sync_detect = df.loc[sync_detect_idx]  # Laser pulse event prior to detection event
+# sync_detect_idx = np.array(detect.index) - 1  # Extract index immediately prior to detection event to match with laser pulse
+# sync_detect = df.loc[sync_detect_idx]  # Laser pulse event prior to detection event
+#
+# detect_time = detect['dtime'].to_numpy()
+# sync_detect_time = sync_detect['dtime'].to_numpy()
+#
+# flight_time = (detect_time - sync_detect_time) * 25  # [ps] Time is in segments of 25 ps
+# flight_time = flight_time[np.where((flight_time >= exclude[0]) & (flight_time < exclude[1]))]  # Exclude t.o.f. where bins ~= 0
+# distance = flight_time / 1e12 * c / 2
 
-detect_time = detect['dtime'].to_numpy()
-sync_detect_time = sync_detect['dtime'].to_numpy()
-
-flight_time = (detect_time - sync_detect_time) * 25  # [ps] Time is in segments of 25 ps
-flight_time = flight_time[np.where((flight_time >= exclude[0]) & (flight_time < exclude[1]))]  # Exclude t.o.f. where bins ~= 0
-distance = flight_time / 1e12 * c / 2
-
-### Histogram of time of flight ###
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-bin_array = set_binwidth(exclude[0]*1e-12, exclude[1]*1e-12, binsize)
-n, bins = np.histogram(flight_time*1e-12, bins=bin_array)
-print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
-binwidth = np.diff(bins)[0]
-N = n / binwidth / n_shots
-center = 0.5 * (bins[:-1]+bins[1:])
-ax1.bar(center*1e6, N, align='center', width=binwidth*1e6, color='b', alpha=0.75)
-ax1.set_xlabel('Time of flight [us]')
-ax1.set_ylabel('Arrival rate [Hz]')
-ax1.set_xlim([0, 60])
-ax1.set_title('Time of flight for INPHAMIS backscatter')
-plt.tight_layout()
-plt.show()
+# ### Histogram of time of flight ###
+# fig = plt.figure()
+# ax1 = fig.add_subplot(111)
+# bin_array = set_binwidth(exclude[0]*1e-12, exclude[1]*1e-12, binsize)
+# n, bins = np.histogram(flight_time*1e-12, bins=bin_array)
+# print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
+# binwidth = np.diff(bins)[0]
+# N = n / binwidth / n_shots
+# center = 0.5 * (bins[:-1]+bins[1:])
+# ax1.bar(center*1e6, N, align='center', width=binwidth*1e6, color='b', alpha=0.75)
+# ax1.set_xlabel('Time of flight [us]')
+# ax1.set_ylabel('Arrival rate [Hz]')
+# ax1.set_xlim([0, 60])
+# ax1.set_title('Time of flight for INPHAMIS backscatter')
+# plt.tight_layout()
+# plt.show()
 
