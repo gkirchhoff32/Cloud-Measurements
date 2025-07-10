@@ -24,10 +24,12 @@ start = time.time()
 # Constants
 c = 299792458  # [m/s] Speed of light
 UNWRAP_MODULO = 33554431  # max clock count rate 2^25-1
+PRF = 14.3e3  # [Hz] laser frequency
 
 # Parameters
 create_csv = False  # Set TRUE to generate a .csv from .ARSENL data
-load_data = True  # Set TRUE to load data into a DataFrame and serialize into a pickle object
+load_data = False  # Set TRUE to load data into a DataFrame and serialize into a pickle object
+histogram = False  # Set TRUE to generate histogram plot, FALSE to generate scatter plot
 #exclude = [27500, 33500]  # [ps] Set temporal boundaries for binning
 exclude = [0, 70e-6]  # [s] temporal binning bounds
 binsize = 120e-9  # [s] bin width for plotting
@@ -48,6 +50,8 @@ rollover = df1.loc[(df1['overflow'] == 1) & (df1['channel'] == 63)]  # Clock rol
 n_shots = len(sync)
 
 # Clean up data first
+print('Starting data conditioning...')
+start_clean = time.time()
 start_idx = sync.index[0]  # first index where laser is recorded
 detect = detect[detect.index > start_idx]  # throw away detections that precede the first laser shot
 
@@ -68,6 +72,7 @@ counts = np.diff(sync_idx) - 1
 remainder = detect.index[-1] - sync_idx[-1]
 counts = np.append(counts, remainder)
 sync_ref = np.repeat(sync_times, counts)
+shots_ref = np.repeat(np.arange(len(sync)), counts)
 
 # detect_times_rel = detect_times.sub(sync_ref)
 # print(detect_times_rel)
@@ -92,25 +97,40 @@ detect_times_rel[rollover_idx] += UNWRAP_MODULO
 flight_time = detect_times_rel * 25e-12  # [s] counts were in 25 ps increments
 distance = flight_time * c / 2  # [m]
 
-### Histogram of time of flight ###
-fig = plt.figure()
-ax1 = fig.add_subplot(111)
-bin_array = set_binwidth(exclude[0], exclude[1], binsize)
-n, bins = np.histogram(flight_time, bins=bin_array)
-print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
-binwidth = np.diff(bins)[0]  # [s]
-binwidth_range = binwidth * c / 2  # [m]
-flux = n / binwidth / n_shots  # [Hz]
-center = 0.5 * (bins[:-1]+bins[1:])  # [s]
-center_range = center * c / 2  # [m]
-ax1.barh(center_range/1e3, flux, align='center', height=binwidth_range/1e3, color='b', alpha=0.75)
-ax1.set_ylabel('Range [km]')
-ax1.set_xlabel('Arrival rate [Hz]')
-# ax1.set_xlim([0, 60])
-ax1.set_title('CoBaLT backscatter')
-ax1.set_xscale('log')
-plt.tight_layout()
-plt.show()
+print('Finished data conditioning.\nTime elapsed: {:.1f} seconds'.format(time.time()-start_clean))
+
+if histogram:
+    ### Histogram of time of flight ###
+    fig = plt.figure(dpi=300)
+    ax1 = fig.add_subplot(111)
+    bin_array = set_binwidth(exclude[0], exclude[1], binsize)
+    n, bins = np.histogram(flight_time, bins=bin_array)
+    print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
+    binwidth = np.diff(bins)[0]  # [s]
+    binwidth_range = binwidth * c / 2  # [m]
+    flux = n / binwidth / n_shots  # [Hz]
+    center = 0.5 * (bins[:-1]+bins[1:])  # [s]
+    center_range = center * c / 2  # [m]
+    ax1.barh(center_range/1e3, flux, align='center', height=binwidth_range/1e3, color='b', alpha=0.75)
+    ax1.set_ylabel('Range [km]')
+    ax1.set_xlabel('Arrival rate [Hz]')
+    # ax1.set_xlim([0, 60])
+    ax1.set_title('CoBaLT backscatter')
+    ax1.set_xscale('log')
+    plt.tight_layout()
+    plt.show()
+else: # if histogram variable is FALSE, scatter plot
+    fig = plt.figure(dpi=200, figsize=(8, 4))
+    ax = fig.add_subplot(111)
+    ax.scatter(shots_ref[:]/PRF, distance[:]/1e3, s=0.001, linewidths=0)
+    ax.set_ylim([0, c/2/PRF/1e3])
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Distance [km]')
+    ax.set_title('CoBaLT Backscatter')
+    ax.set_ylim([4.5, 5.5])
+    # ax.set_yscale('log')
+    plt.tight_layout()
+    plt.show()
 
 
 
