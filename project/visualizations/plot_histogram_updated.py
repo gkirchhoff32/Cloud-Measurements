@@ -23,6 +23,7 @@ from load_ARSENL_data import load_INPHAMIS_data, set_binwidth, data_dir, fname, 
 start = time.time()
 # Constants
 c = 299792458  # [m/s] Speed of light
+UNWRAP_MODULO = 33554431  # max clock count rate 2^25-1
 
 # Parameters
 create_csv = False  # Set TRUE to generate a .csv from .ARSENL data
@@ -43,30 +44,53 @@ infile.close()
 df1 = df.loc[df['dtime'] != 0]
 detect = df1.loc[(df1['overflow'] == 0) & (df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
 sync = df1.loc[(df1['overflow'] == 1) & (df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
-rollover = df1.loc[(df1['overflow'] == 1) & (df1['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63)
+rollover = df1.loc[(df1['overflow'] == 1) & (df1['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
 n_shots = len(sync)
 
 # Clean up data first
 start_idx = sync.index[0]  # first index where laser is recorded
 detect = detect[detect.index > start_idx]  # throw away detections that precede the first laser shot
-for i in rollover.index:
-    # return closest sync that comes after it
 
-    sync_rollover_idx = sync[sync.index > i].index[0]
-    detect_rollover_idx = detect[(detect.index > i) & (detect.index < sync_rollover_idx)].index
-    rollover_dtime = rollover.loc[i]['dtime']
-    print(rollover_dtime)
-    print(i)
-    print(sync_rollover_idx)
-    print(detect_rollover_idx)
+df2 = df1.drop(rollover.index)  # Remove rollover events
+df2 = df2.reset_index(drop=True)  # Reset indices
 
-    print(detect.loc[detect_rollover_idx]['dtime'])
+detect = df2.loc[(df2['overflow'] == 0) & (df2['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
+sync = df2.loc[(df2['overflow'] == 1) & (df2['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
+start_idx = sync.index[0]
+detect = detect[detect.index > start_idx]
 
-    quit()
+sync_times = sync['dtime']
+detect_times = detect['dtime']
 
-#print(rollover)
+sync_idx = sync.index
+ref_sync = np.zeros((1, len(detect)))  # initialize reference sync timestamps
+counts = np.diff(sync_idx) - 1
+remainder = detect.index[-1] - sync_idx[-1]
+counts = np.append(counts, remainder)
+sync_ref = np.repeat(sync_times, counts)
+
+detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
+rollover_idx = np.where(detect_times_rel < 0)[0]
+detect_times_rel[rollover_idx] += UNWRAP_MODULO
+print(np.where(detect_times_rel<0)[0])
+# print()
 
 quit()
+
+# for i in rollover.index:
+#     cnt += 1
+#     print(i)
+#     # return closest sync that comes after it
+#     sync_rollover_idx = sync[sync.index > i].index[0]
+#     detect_rollover_idx = detect[(detect.index > i) & (detect.index < sync_rollover_idx)].index
+#     rollover_dtime = detect.loc[detect_rollover_idx]['dtime']
+#     detect.loc[detect_rollover_idx]['dtime'] = rollover_dtime + max_clock_cnt
+#     print(detect_rollover_idx)
+#     if cnt == 2:
+#         quit()
+# #print(rollover)
+#
+# quit()
 
 
 

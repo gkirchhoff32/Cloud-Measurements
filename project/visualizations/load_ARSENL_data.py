@@ -26,7 +26,7 @@ import pickle
 c = 299792458  # [m/s] Speed of light
 
 # data_dir = r'/home/arsenl/inphamis-acquisition/two_picos_v2/CoBaLT_data'
-data_dir = r'/home/arsenl/inphamis-acquisition/two_picos_v2/CoBaLT_data'
+data_dir = r'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
 fname = r'/Dev_0_-_2025-07-07_22.08.23.ARSENL'
 picklename = 'test'
 
