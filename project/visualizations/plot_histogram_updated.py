@@ -17,6 +17,7 @@ import numpy as np
 import time
 import pickle
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
 from load_ARSENL_data import load_INPHAMIS_data, set_binwidth, data_dir, fname, picklename
 
@@ -29,7 +30,7 @@ PRF = 14.3e3  # [Hz] laser frequency
 # Parameters
 create_csv = False  # Set TRUE to generate a .csv from .ARSENL data
 load_data = False  # Set TRUE to load data into a DataFrame and serialize into a pickle object
-histogram = False  # Set TRUE to generate histogram plot, FALSE to generate scatter plot
+histogram = True  # Set TRUE to generate histogram plot, FALSE to generate scatter plot
 #exclude = [27500, 33500]  # [ps] Set temporal boundaries for binning
 exclude = [0, 70e-6]  # [s] temporal binning bounds
 binsize = 120e-9  # [s] bin width for plotting
@@ -73,6 +74,7 @@ remainder = detect.index[-1] - sync_idx[-1]
 counts = np.append(counts, remainder)
 sync_ref = np.repeat(sync_times, counts)
 shots_ref = np.repeat(np.arange(len(sync)), counts)
+shots_time = shots_ref / PRF  # [s] Equivalent time for each shot
 
 # detect_times_rel = detect_times.sub(sync_ref)
 # print(detect_times_rel)
@@ -95,37 +97,68 @@ detect_times_rel[rollover_idx] += UNWRAP_MODULO
 # quit()
 
 flight_time = detect_times_rel * 25e-12  # [s] counts were in 25 ps increments
-distance = flight_time * c / 2  # [m]
+range = flight_time * c / 2  # [m]
 
 print('Finished data conditioning.\nTime elapsed: {:.1f} seconds'.format(time.time()-start_clean))
 
 if histogram:
-    ### Histogram of time of flight ###
-    fig = plt.figure(dpi=300)
-    ax1 = fig.add_subplot(111)
-    bin_array = set_binwidth(exclude[0], exclude[1], binsize)
-    n, bins = np.histogram(flight_time, bins=bin_array)
-    print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
-    binwidth = np.diff(bins)[0]  # [s]
-    binwidth_range = binwidth * c / 2  # [m]
-    flux = n / binwidth / n_shots  # [Hz]
-    center = 0.5 * (bins[:-1]+bins[1:])  # [s]
-    center_range = center * c / 2  # [m]
-    ax1.barh(center_range/1e3, flux, align='center', height=binwidth_range/1e3, color='b', alpha=0.75)
-    ax1.set_ylabel('Range [km]')
-    ax1.set_xlabel('Arrival rate [Hz]')
-    # ax1.set_xlim([0, 60])
-    ax1.set_title('CoBaLT backscatter')
-    ax1.set_xscale('log')
+    tbinsize = 0.25 # [s]
+    rbinsize = 2  # [m]
+
+    tbins = np.arange(0, shots_time[-1], tbinsize)  # [s]
+    rbins = np.arange(0, c/2/PRF, rbinsize)  # [m]
+
+    H, t_binedges, r_binedges = np.histogram2d(shots_time, range, bins=[tbins, rbins])
+    H = H.T  # flip axes
+    flux = H / (rbinsize/c*2) / (tbinsize*PRF)  # [Hz]
+
+    bg_edges = [9900, 10100]  # [m] background estimation ranges
+    bg_edges_idx = [np.argmin(np.abs(rbins-bg_edges[0])), np.argmin(np.abs(rbins-bg_edges[1]))]
+    bg_flux = np.mean(flux[bg_edges_idx[0]:bg_edges_idx[1], :])
+    flux_bg_sub = flux - bg_flux  # [Hz] flux with background subtracted
+
+    fig = plt.figure(dpi=200, figsize=(8, 4))
+    ax = fig.add_subplot(111)
+    mesh = ax.pcolormesh(t_binedges, r_binedges/1e3, flux_bg_sub, cmap='viridis', norm=LogNorm(vmin=bg_flux, vmax=flux.max()))
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Range [km]')
+    fig.suptitle('CoBaLT Backscatter Flux')
+    ax.set_title('Scale {:.1f} m x {:.2f} s'.format(rbinsize, tbinsize))
+    ax.set_ylim([4, 6])  # [km]
+    cbar = fig.colorbar(mesh, ax=ax)
+    cbar.set_label('Flux [Hz]')
     plt.tight_layout()
     plt.show()
+
+
+    # ### Histogram of time of flight ###
+    # fig = plt.figure(dpi=300)
+    # ax1 = fig.add_subplot(111)
+    # bin_array = set_binwidth(exclude[0], exclude[1], binsize)
+    # n, bins = np.histogram(flight_time, bins=bin_array)
+    # print('Histogram time elapsed: {:.3} sec'.format(time.time() - start))
+    # binwidth = np.diff(bins)[0]  # [s]
+    # binwidth_range = binwidth * c / 2  # [m]
+    # flux = n / binwidth / n_shots  # [Hz]
+    # center = 0.5 * (bins[:-1]+bins[1:])  # [s]
+    # center_range = center * c / 2  # [m]
+    # ax1.barh(center_range/1e3, flux, align='center', height=binwidth_range/1e3, color='b', alpha=0.75)
+    # ax1.set_ylabel('Range [km]')
+    # ax1.set_xlabel('Arrival rate [Hz]')
+    # # ax1.set_xlim([0, 60])
+    # ax1.set_title('CoBaLT backscatter')
+    # ax1.set_xscale('log')
+    # plt.tight_layout()
+    # plt.show()
+
+
 else: # if histogram variable is FALSE, scatter plot
     fig = plt.figure(dpi=200, figsize=(8, 4))
     ax = fig.add_subplot(111)
-    ax.scatter(shots_ref[:]/PRF, distance[:]/1e3, s=0.001, linewidths=0)
+    ax.scatter(shots_time, range/1e3, s=0.001, linewidths=0)
     ax.set_ylim([0, c/2/PRF/1e3])
     ax.set_xlabel('Time [s]')
-    ax.set_ylabel('Distance [km]')
+    ax.set_ylabel('Range [km]')
     ax.set_title('CoBaLT Backscatter')
     ax.set_ylim([4.5, 5.5])
     # ax.set_yscale('log')
