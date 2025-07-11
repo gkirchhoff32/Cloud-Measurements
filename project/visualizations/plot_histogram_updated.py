@@ -103,7 +103,7 @@ print('Finished data conditioning.\nTime elapsed: {:.1f} seconds'.format(time.ti
 
 if histogram:
     tbinsize = 0.25 # [s]
-    rbinsize = 2  # [m]
+    rbinsize = 0.1  # [m]
 
     tbins = np.arange(0, shots_time[-1], tbinsize)  # [s]
     rbins = np.arange(0, c/2/PRF, rbinsize)  # [m]
