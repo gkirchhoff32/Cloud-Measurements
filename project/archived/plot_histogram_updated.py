@@ -19,7 +19,7 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
-from load_ARSENL_data import load_INPHAMIS_data, set_binwidth, data_dir, fname, picklename
+from load_ARSENL_data import load_INPHAMIS_data, data_dir, fname, picklename
 
 start = time.time()
 # Constants
@@ -33,7 +33,7 @@ load_data = False  # Set TRUE to load data into a DataFrame and serialize into a
 histogram = True  # Set TRUE to generate histogram plot, FALSE to generate scatter plot
 #exclude = [27500, 33500]  # [ps] Set temporal boundaries for binning
 exclude = [0, 70e-6]  # [s] temporal binning bounds
-binsize = 120e-9  # [s] bin width for plotting
+# binsize = 120e-9  # [s] bin width for plotting
 
 # Load INPHAMIS .ARSENL data if not yet serialized
 if load_data:
@@ -48,7 +48,6 @@ df1 = df.loc[df['dtime'] != 0]
 detect = df1.loc[(df1['overflow'] == 0) & (df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
 sync = df1.loc[(df1['overflow'] == 1) & (df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
 rollover = df1.loc[(df1['overflow'] == 1) & (df1['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
-n_shots = len(sync)
 
 # Clean up data first
 print('Starting data conditioning...')
@@ -68,7 +67,7 @@ sync_times = sync['dtime']
 detect_times = detect['dtime']
 
 sync_idx = sync.index
-ref_sync = np.zeros((1, len(detect)))  # initialize reference sync timestamps
+# ref_sync = np.zeros((1, len(detect)))  # initialize reference sync timestamps
 counts = np.diff(sync_idx) - 1
 remainder = detect.index[-1] - sync_idx[-1]
 counts = np.append(counts, remainder)
@@ -76,25 +75,9 @@ sync_ref = np.repeat(sync_times, counts)
 shots_ref = np.repeat(np.arange(len(sync)), counts)
 shots_time = shots_ref / PRF  # [s] Equivalent time for each shot
 
-# detect_times_rel = detect_times.sub(sync_ref)
-# print(detect_times_rel)
 detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
 rollover_idx = np.where(detect_times_rel < 0)[0]
 detect_times_rel[rollover_idx] += UNWRAP_MODULO
-
-# # Divide up into columns per shot
-# # Find number of seconds
-# n_sec = len(sync) // 14300  # number of full seconds acquired
-# det_2d_array = []
-# sync_shot_idx = np.zeros(n_sec+1)
-# for i in range(n_sec):
-#     idx_i = 14300 * (i+1)
-#     sync_idx_i = sync_idx[idx_i]
-#     sync_shot_idx[i+1] = sync_idx_i
-#     val_det_idx = (detect.index>sync_shot_idx[i]) & (detect.index<sync_shot_idx[i+1])
-#     print(val_det_idx)
-#     quit()
-# quit()
 
 flight_time = detect_times_rel * 25e-12  # [s] counts were in 25 ps increments
 range = flight_time * c / 2  # [m]

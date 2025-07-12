@@ -1,0 +1,25 @@
+constants:
+  c: 299792458  # [m/s] Speed of light
+
+system_params:
+  unwrap_modulo: 33554431    # clock number per rollover (2^25-1)
+  clock_res: 25.0e-12        # clock resolution
+  PRF: 14300                 # [Hz] laser repetition rate
+
+file_params:
+  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
+  preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
+  fname: '/Dev_0_-_2025-07-10_01.48.17_180sec.ARSENL'  # main data file name
+
+plot_params:
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
+
+  exclude: [0, 70.0e-6]          # [s] temporal window bounds
+  tbinsize: 0.1                    # [s] temporal bin size
+  rbinsize: 0.1                  # [m] range bin size
+  bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
+  ylim: [4, 6]                   # [km] y-axis limits if 'use_ylim' is TRUE
+
+  dpi: 200          # set dpi for plotting
+  figsize: [12, 6]  # figure size in inches
