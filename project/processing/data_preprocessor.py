@@ -60,7 +60,7 @@ class DataPreprocessor:
         if self.file_path_nc.exists():
             print('Preprocessed datafile already exists.')
         else:
-            print('Preprocessed datafile not found. Starting process to create it...')
+            print('Preprocessed datafile not found. Starting process to create it...\n')
             # If pickle file does not exist yet, then create it
             if self.file_path_pkl.exists() == False:
                 print('No existing pickle object found.\nCreating pickle object...')
