@@ -7,9 +7,9 @@ system_params:
   PRF: 14300                 # [Hz] laser repetition rate
 
 file_params:
-  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
+  data_dir: 'C:\Users\jason\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
-  fname: '/first_5GB.ARSENL'  # main data file name
+  fname: '/first_10GB.ARSENL'  # main data file name
 
 plot_params:
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 

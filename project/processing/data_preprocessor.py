@@ -22,7 +22,7 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
-        self.fname_pkl = None
+        self. fname_pkl = None
         self.fname_nc = None
         self.file_path_pkl = None
         self.file_path_nc = None
@@ -66,6 +66,7 @@ class DataPreprocessor:
                 print('No existing pickle object found.\nCreating pickle object...')
                 start = time.time()
                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+                # df = pd.read_csv(self.data_dir + self.fname, delimiter=',', encoding='latin-1', on_bad_lines='skip')
                 outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
                 pickle.dump(df, outfile)
                 outfile.close()
