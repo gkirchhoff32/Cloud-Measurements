@@ -41,13 +41,14 @@ class DataPreprocessor:
         self.c = config['constants']['c']  # [m/s] speed of light
 
         # Plot params
-        self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
-        self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
-        self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
-        self.dpi = config['plot_params']['dpi']            # dots-per-inch
-        self.figsize = config['plot_params']['figsize']    # figure size in inches
-        self.use_ylim = config['plot_params']['use_ylim']  # TRUE value activates 'axes.set_ylim' argument
-        self.ylim = config['plot_params']['ylim']          # [km] y-axis limits
+        self.tbinsize = config['plot_params']['tbinsize']    # [s] temporal bin size
+        self.rbinsize = config['plot_params']['rbinsize']    # [m] range bin size
+        self.bg_edges = config['plot_params']['bg_edges']    # [m] range background window
+        self.dpi = config['plot_params']['dpi']              # dots-per-inch
+        self.figsize = config['plot_params']['figsize']      # figure size in inches
+        self.use_ylim = config['plot_params']['use_ylim']    # TRUE value activates 'axes.set_ylim' argument
+        self.ylim = config['plot_params']['ylim']            # [km] y-axis limits
+        self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE, else scatter plot
 
 
     def load_data(self):
@@ -194,8 +195,9 @@ class DataPreprocessor:
         r_binedges = histogram_results['r_binedges']  # [m] range bin edges
 
         # Start plotting
-        print('\nStarting to generate plot...')
+        print('\nStarting to generate histogram plot...')
         start = time.time()
+
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
         mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
@@ -212,6 +214,29 @@ class DataPreprocessor:
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
         plt.show()
 
+    def plot_scatter(self, preprocessed_results):
+        # Load preprocessed data
+        ranges = preprocessed_results['ranges']
+        shots_time = preprocessed_results['shots_time']
+
+        # Start plotting
+        print('\nStarting to generate scatter plot...')
+        start = time.time()
+
+        fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
+        ax = fig.add_subplot(111)
+        ax.scatter(shots_time, ranges / 1e3, s=0.001, linewidths=0)
+        ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Range [km]')
+        ax.set_title('CoBaLT Backscatter')
+        # ax.set_ylim([4.5, 5.5])
+        # ax.set_yscale('log')
+        plt.tight_layout()
+
+        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
+        plt.show()
+
 
 def main():
     config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
@@ -221,8 +246,11 @@ def main():
     dp = DataPreprocessor(config)
     dp.load_data()
     preprocessed_results = dp.preprocess()
-    histogram_results = dp.gen_histogram(preprocessed_results)
-    dp.plot_histogram(histogram_results)
+    if dp.histogram:
+        histogram_results = dp.gen_histogram(preprocessed_results)
+        dp.plot_histogram(histogram_results)
+    else:
+        dp.plot_scatter(preprocessed_results)
 
 
 if __name__ == '__main__':
