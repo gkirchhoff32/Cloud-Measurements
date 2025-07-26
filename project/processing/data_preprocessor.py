@@ -118,7 +118,7 @@ class DataPreprocessor:
 
             counts = np.diff(
                 sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
-            remainder = detect.index[-1] - sync.index[-1]
+            remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
             counts = np.append(counts, remainder)  # Include last laser shot too
             sync_ref = np.repeat(sync_times,
                                  counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
