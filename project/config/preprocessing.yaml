@@ -17,7 +17,7 @@ plot_params:
 
   exclude: [0, 70.0e-6]          # [s] temporal window bounds
   tbinsize: 1                    # [s] temporal bin size
-  rbinsize: 0.5                  # [m] range bin size
+  rbinsize: 1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
   ylim: [3, 9]                   # [km] y-axis limits if 'use_ylim' is TRUE
 
