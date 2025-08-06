@@ -22,15 +22,18 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
-        self. fname_pkl = None
+        self.fname_pkl = None
         self.fname_nc = None
         self.file_path_pkl = None
         self.file_path_nc = None
+        self.generic_fname = None
+        self.img_save_path = None
 
         # File params
         self.fname = config['file_params']['fname']                        # File name of raw data
         self.data_dir = config['file_params']['data_dir']                  # Directory of raw data
         self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
+        self.image_dir = config['file_params']['image_dir']                # Directory to save images
 
         # System Params
         self.PRF = config['system_params']['PRF']                      # [Hz] laser repetition rate
@@ -49,15 +52,19 @@ class DataPreprocessor:
         self.use_ylim = config['plot_params']['use_ylim']    # TRUE value activates 'axes.set_ylim' argument
         self.ylim = config['plot_params']['ylim']            # [km] y-axis limits
         self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE, else scatter plot
+        self.save_img = config['plot_params']['save_img']    # Save images if TRUE
+        self.save_dpi = config['plot_params']['save_dpi']    # DPI for saved images
+        self.dot_size = config['plot_params']['dot_size']    # Dot size for 'axes.scatter' 's' param
 
 
     def load_data(self):
-        generic_fname = Path(self.fname).stem
-        self.fname_pkl = generic_fname + '.pkl'
-        self.fname_nc = generic_fname + '_preprocessed.nc'
+        self.generic_fname = Path(self.fname).stem
+        self.fname_pkl = self.generic_fname + '.pkl'
+        self.fname_nc = self.generic_fname + '_preprocessed.nc'
         self.file_path_pkl = Path(self.data_dir + self.preprocessed_dir) / self.fname_pkl
         self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
 
+        # Search for preexisting preprocessed datafile. Else, create one.
         if self.file_path_nc.exists():
             print('\nPreprocessed datafile already exists.')
         else:
@@ -118,8 +125,8 @@ class DataPreprocessor:
 
             counts = np.diff(
                 sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
-            remainder = detect.index[-1] - sync.index[-1]
-            # remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
+            # remainder = detect.index[-1] - sync.index[-1]
+            remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
             counts = np.append(counts, remainder)  # Include last laser shot too
             sync_ref = np.repeat(sync_times,
                                  counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
@@ -210,12 +217,16 @@ class DataPreprocessor:
         ax.set_ylabel('Range [km]')
         fig.suptitle('CoBaLT Backscatter Flux')
         ax.set_title('Scale {:.1f} m x {:.2f} s'.format(self.rbinsize, self.tbinsize))
-        if self.use_ylim:
-            ax.set_ylim(self.ylim)
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
         cbar = fig.colorbar(mesh, ax=ax)
         cbar.set_label('Flux [Hz]')
         plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
+        if self.save_img:
+            img_fname = self.generic_fname + '_hg' + '.png'
+            self.img_save_path = Path(self.data_dir + self.image_dir) / img_fname
+            fname = self.get_unique_filename(self.img_save_path)
+            fig.savefig(fname, dpi=self.save_dpi)
         plt.show()
 
     def plot_scatter(self, preprocessed_results):
@@ -229,17 +240,28 @@ class DataPreprocessor:
 
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
-        ax.scatter(shots_time, ranges / 1e3, s=0.001, linewidths=0)
-        ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
+        ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, linewidths=0)
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
         ax.set_title('CoBaLT Backscatter')
-        # ax.set_ylim([4.5, 5.5])
-        # ax.set_yscale('log')
         plt.tight_layout()
-
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
+        if self.save_img:
+            img_fname = self.generic_fname + '_scatter' + '.png'
+            self.img_save_path = Path(self.data_dir + self.image_dir) / img_fname
+            fname = self.get_unique_filename(self.img_save_path)
+            fig.savefig(fname, dpi=self.save_dpi)
         plt.show()
+
+    def get_unique_filename(self, filename):
+        base, ext = os.path.splitext(filename)
+        counter = 0
+        filename = f"{base}_{counter}{ext}"
+        while os.path.exists(filename):
+            filename = f"{base}_{counter}{ext}"
+            counter += 1
+        return filename
 
 
 def main():
