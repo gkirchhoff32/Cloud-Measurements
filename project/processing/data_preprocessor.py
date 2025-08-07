@@ -189,21 +189,28 @@ class DataPreprocessor:
         bg_flux = np.mean(flux[bg_edges_idx[0]:bg_edges_idx[1], :])
         flux_bg_sub = flux - bg_flux  # [Hz] flux with background subtracted
 
+        rbins_centers = (r_binedges + 0.5*(r_binedges[1]-r_binedges[0]))[:-1]
+        flux_corrected = flux_bg_sub * (rbins_centers**2)[:, np.newaxis]  # [Hz m^2] range corrected flux (after bg subtraction)
+
+        # TODO: range correct (R**2). Maybe make bg and range corrections a separate function?
+
         print('Finished generating histogram.\nTime elapsed: {:.1f} s'.format(time.time() - start))
 
         return {
             't_binedges': t_binedges,
             'r_binedges': r_binedges,
             'flux_bg_sub': flux_bg_sub,
-            'bg_flux': bg_flux
+            'bg_flux': bg_flux,
+            'flux_corrected': flux_corrected
         }
 
     def plot_histogram(self, histogram_results):
         # Processed data
-        flux_bg_sub = histogram_results['flux_bg_sub']  # [Hz] backscatter flux
-        bg_flux = histogram_results['bg_flux']  # [Hz] background flux
-        t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
-        r_binedges = histogram_results['r_binedges']  # [m] range bin edges
+        flux_bg_sub = histogram_results['flux_bg_sub']        # [Hz] backscatter flux
+        flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
+        bg_flux = histogram_results['bg_flux']                # [Hz] background flux
+        t_binedges = histogram_results['t_binedges']          # [s] temporal bin edges
+        r_binedges = histogram_results['r_binedges']          # [m] range bin edges
 
         # Start plotting
         print('\nStarting to generate histogram plot...')
@@ -211,8 +218,10 @@ class DataPreprocessor:
 
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
-        mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
-                             norm=LogNorm(vmin=bg_flux, vmax=flux_bg_sub.max()))
+        # mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
+        #                      norm=LogNorm(vmin=bg_flux, vmax=flux_bg_sub.max()))
+        mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
+                             norm=LogNorm(vmin=bg_flux, vmax=flux_corrected.max()))
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
         fig.suptitle('CoBaLT Backscatter Flux')
