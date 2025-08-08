@@ -7,14 +7,14 @@ system_params:
   PRF: 14200                 # [Hz] laser repetition rate
 
 file_params:
-  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light\20250805'  # Data directory
+  data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light\20250805'  # Data directory
   preprocessed_dir: '/../preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/../images/20250805'  # directory where images are saved
-  fname: '/Dev_0_20250805_01.47.13_00.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-08-05_02.26.56.ARSENL'  # main data file name
 
 plot_params:
-  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
-  use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  use_ylim: False   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
   save_img: True  # Set TRUE to save figure out to image directory.
 
   exclude: [0, 70.0e-6]          # [s] temporal window bounds
