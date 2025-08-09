@@ -44,17 +44,18 @@ class DataPreprocessor:
         self.c = config['constants']['c']  # [m/s] speed of light
 
         # Plot params
-        self.tbinsize = config['plot_params']['tbinsize']    # [s] temporal bin size
-        self.rbinsize = config['plot_params']['rbinsize']    # [m] range bin size
-        self.bg_edges = config['plot_params']['bg_edges']    # [m] range background window
-        self.dpi = config['plot_params']['dpi']              # dots-per-inch
-        self.figsize = config['plot_params']['figsize']      # figure size in inches
-        self.use_ylim = config['plot_params']['use_ylim']    # TRUE value activates 'axes.set_ylim' argument
-        self.ylim = config['plot_params']['ylim']            # [km] y-axis limits
-        self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE, else scatter plot
-        self.save_img = config['plot_params']['save_img']    # Save images if TRUE
-        self.save_dpi = config['plot_params']['save_dpi']    # DPI for saved images
-        self.dot_size = config['plot_params']['dot_size']    # Dot size for 'axes.scatter' 's' param
+        self.tbinsize = config['plot_params']['tbinsize']          # [s] temporal bin size
+        self.rbinsize = config['plot_params']['rbinsize']          # [m] range bin size
+        self.bg_edges = config['plot_params']['bg_edges']          # [m] range background window
+        self.dpi = config['plot_params']['dpi']                    # dots-per-inch
+        self.figsize = config['plot_params']['figsize']            # figure size in inches
+        self.use_ylim = config['plot_params']['use_ylim']          # TRUE value activates 'axes.set_ylim' argument
+        self.ylim = config['plot_params']['ylim']                  # [km] y-axis limits
+        self.histogram = config['plot_params']['histogram']        # Plot histogram if TRUE, else scatter plot
+        self.save_img = config['plot_params']['save_img']          # Save images if TRUE
+        self.save_dpi = config['plot_params']['save_dpi']          # DPI for saved images
+        self.dot_size = config['plot_params']['dot_size']          # Dot size for 'axes.scatter' 's' param
+        self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background subtracted and range corrected
 
 
     def load_data(self):
@@ -73,7 +74,19 @@ class DataPreprocessor:
             if self.file_path_pkl.exists() == False:
                 print('No existing pickle object found.\nCreating pickle object...')
                 start = time.time()
-                df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+
+                # Look at first row to check for headers.
+                headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+                first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+
+                # Check if first row is all strings or digits. If digits, likely missing the headers.
+                # Can happen when splitting/splicing data files.
+                if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
+                    df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+                else:
+                    df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
+                    df.columns = headers
+                # df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
                 # df = pd.read_csv(self.data_dir + self.fname, delimiter=',', encoding='latin-1', on_bad_lines='skip')
                 outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
                 pickle.dump(df, outfile)
@@ -201,11 +214,13 @@ class DataPreprocessor:
             'r_binedges': r_binedges,
             'flux_bg_sub': flux_bg_sub,
             'bg_flux': bg_flux,
-            'flux_corrected': flux_corrected
+            'flux_corrected': flux_corrected,
+            'flux_raw': flux
         }
 
     def plot_histogram(self, histogram_results):
         # Processed data
+        flux_raw = histogram_results['flux_raw']
         flux_bg_sub = histogram_results['flux_bg_sub']        # [Hz] backscatter flux
         flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
         bg_flux = histogram_results['bg_flux']                # [Hz] background flux
@@ -218,17 +233,22 @@ class DataPreprocessor:
 
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
-        # mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
-        #                      norm=LogNorm(vmin=bg_flux, vmax=flux_bg_sub.max()))
-        mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
-                             norm=LogNorm(vmin=bg_flux, vmax=flux_corrected.max()))
+        if self.flux_correct:
+            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
+                             norm=LogNorm(vmin=bg_flux*((self.bg_edges[0]+self.bg_edges[1])/2)**2, vmax=flux_corrected.max()))
+            fig.suptitle('CoBaLT Range-Corrected Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Range-Corrected Flux [Hz m^2]')
+        else:
+            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_raw, cmap='viridis',
+                             norm=LogNorm(vmin=bg_flux, vmax=flux_raw.max()))
+            fig.suptitle('CoBaLT Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Flux [Hz]')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
-        fig.suptitle('CoBaLT Backscatter Flux')
         ax.set_title('Scale {:.1f} m x {:.2f} s'.format(self.rbinsize, self.tbinsize))
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
-        cbar = fig.colorbar(mesh, ax=ax)
-        cbar.set_label('Flux [Hz]')
         plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
         if self.save_img:
