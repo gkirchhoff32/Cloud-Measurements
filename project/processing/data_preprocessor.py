@@ -22,9 +22,7 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
-        # self.fname_pkl = None
         self.fname_nc = None
-        # self.file_path_pkl = None
         self.file_path_nc = None
         self.generic_fname = None
         self.img_save_path = None
