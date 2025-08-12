@@ -11,7 +11,7 @@ file_params:
   # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light\20250805'
   preprocessed_dir: '/../preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/../images/20250805'  # directory where images are saved
-  fname: '/Dev_1_20250805_01.34.27_00.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-08-05_01.34.27.ARSENL'  # main data file name
 
 plot_params:
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 

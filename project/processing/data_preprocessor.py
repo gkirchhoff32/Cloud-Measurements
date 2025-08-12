@@ -7,7 +7,6 @@ This defines methods that are important for preparing .ARSENL data for processin
 
 import numpy as np
 import time
-import pickle
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import pandas as pd
@@ -15,11 +14,15 @@ import yaml
 from pathlib import Path
 import xarray as xr
 import os
+import dask.dataframe as dd
+import dask
 
 
 class DataPreprocessor:
     def __init__(self, config):
         self.config = config
+        self.ddf = None
+        self.ddf1 = None
         self.df = None
         self.df1 = None
         self.fname_nc = None
@@ -61,89 +64,178 @@ class DataPreprocessor:
         self.fname_nc = self.generic_fname + '.nc'
         self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
 
-        # Load preprocessed data if exists. Otherwise, preprocess and save out results to .nc file.
-        if self.file_path_nc.exists():
-            print('\nPreprocessed data file found. Loading data file...')
-            ds = xr.open_dataset(self.file_path_nc)
-            ranges = ds['ranges']
-            shots_time = ds['shots_time']
-            print('Preprocessed data file loaded.')
-        else:
-            print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
-            # Look at first row to check for headers.
-            headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-            first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+        print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
+        self.ddf = dd.read_csv(self.data_dir + self.fname, delimiter=',')
 
-            # Check if first row is all strings or digits. If digits, likely missing the headers.
-            # Can happen when splitting/splicing data files.
-            if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
-                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
-            else:
-                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
-                self.df.columns = headers
+        # rollover = self.ddf.loc[(self.ddf['overflow'] == 1) & (
+        #         self.ddf['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
+        #
+        # print(rollover)
 
-            rollover = self.df.loc[(self.df['overflow'] == 1) & (
-                    self.df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
+        start = time.time()
+        # Create new dataframe without rollover events
+        # self.ddf1 = self.ddf[rollover]  # Remove rollover events
+        self.ddf1 = self.ddf[(self.ddf['overflow'] != 1) & (
+                self.ddf['channel'] != 63)]
+        self.ddf1 = self.ddf1.reset_index(drop=True)  # Reset indices
 
-            start = time.time()
-            # Create new dataframe without rollover events
-            self.df1 = self.df.drop(rollover.index)  # Remove rollover events
-            self.df1 = self.df1.reset_index(drop=True)  # Reset indices
+        # # Identify detection events ('detect') and laser pulse events ('sync')
+        # detect = self.ddf1.loc[
+        #     (self.ddf1['overflow'] == 0) & (
+        #             self.ddf1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
+        # sync = self.ddf1.loc[
+        #     (self.ddf1['overflow'] == 1) & (
+        #             self.ddf1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
 
-            # Identify detection events ('detect') and laser pulse events ('sync')
-            detect = self.df1.loc[
-                (self.df1['overflow'] == 0) & (
-                        self.df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
-            sync = self.df1.loc[
-                (self.df1['overflow'] == 1) & (
-                        self.df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
+        # Ignore detections that precede first laser pulse event
+        detect = self.ddf1[(self.ddf1['overflow'] == 0) & (
+                    self.ddf1['channel'] == 0)]
+        sync = self.ddf1[(self.ddf1['overflow'] == 1) & (
+                    self.ddf1['channel'] == 0)]
 
-            # Ignore detections that precede first laser pulse event
-            start_idx = sync.index[0]
-            detect = detect[detect.index > start_idx]
+        print(detect)
+        print(sync)
 
-            # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
-            sync_times = sync['dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
-            detect_times = detect['dtime']
+        start_idx = sync.index.compute()
+        detect = detect[detect.index > start_idx]
 
-            counts = np.diff(
-                sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
-            remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
-            counts = np.append(counts, remainder)  # Include last laser shot too
-            sync_ref = np.repeat(sync_times,
-                                 counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
-            shots_ref = np.repeat(np.arange(len(sync)), counts)
-            shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
+        # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
+        sync_times = sync[
+            'dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
+        detect_times = detect['dtime']
 
-            # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
-            detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
+        counts = np.diff(
+            sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
+        remainder = max(0, detect.index[-1] - sync.index[
+            -1])  # return positive remainder. If negative, there is zero remainder.
+        counts = np.append(counts, remainder)  # Include last laser shot too
+        sync_ref = np.repeat(sync_times,
+                             counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
+        shots_ref = np.repeat(np.arange(len(sync)), counts)
+        shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
 
-            # Handle rollover events. Add the clock rollover value to any negative timestamps.
-            # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
-            # This is because if detections occurred between a rollover and sync event, then corresponding "detect_time_rel" element will be negative.
-            rollover_idx = np.where(detect_times_rel < 0)[0]
-            detect_times_rel[rollover_idx] += self.unwrap_modulo
+        # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
+        detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
 
-            # Convert to flight times and range
-            flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
-            ranges = flight_times * self.c / 2  # [m]
+        # Handle rollover events. Add the clock rollover value to any negative timestamps.
+        # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
+        # This is because if detections occurred between a rollover and sync event, then corresponding "detect_time_rel" element will be negative.
+        rollover_idx = np.where(detect_times_rel < 0)[0]
+        detect_times_rel[rollover_idx] += self.unwrap_modulo
 
-            # Save preprocessed data to netCDF
-            preprocessed_data = xr.Dataset(
-                data_vars=dict(
-                    ranges=ranges,
-                    shots_time=shots_time
-                )
+        # Convert to flight times and range
+        flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
+        ranges = flight_times * self.c / 2  # [m]
+
+        # Save preprocessed data to netCDF
+        preprocessed_data = xr.Dataset(
+            data_vars=dict(
+                ranges=ranges,
+                shots_time=shots_time
             )
+        )
 
-            preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), self.fname_nc))
+        preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), self.fname_nc))
 
-            print('Finished preprocessing. File created.\nTime elapsed: {:.1f} seconds'.format(time.time() - start))
+        print('Finished preprocessing. File created.\nTime elapsed: {:.1f} seconds'.format(time.time() - start))
 
         return {
             'ranges': ranges,
             'shots_time': shots_time
-        }
+    }
+
+
+
+
+
+    # def preprocess(self):
+    #     self.generic_fname = Path(self.fname).stem
+    #     self.fname_nc = self.generic_fname + '.nc'
+    #     self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
+    #
+    #     # Load preprocessed data if exists. Otherwise, preprocess and save out results to .nc file.
+    #     if self.file_path_nc.exists():
+    #         print('\nPreprocessed data file found. Loading data file...')
+    #         ds = xr.open_dataset(self.file_path_nc)
+    #         ranges = ds['ranges']
+    #         shots_time = ds['shots_time']
+    #         print('Preprocessed data file loaded.')
+    #     else:
+    #         print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
+    #         # Look at first row to check for headers.
+    #         headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+    #         first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+    #
+    #         # Check if first row is all strings or digits. If digits, likely missing the headers.
+    #         # Can happen when splitting/splicing data files.
+    #         if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
+    #             self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+    #         else:
+    #             self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
+    #             self.df.columns = headers
+    #
+    #         rollover = self.df.loc[(self.df['overflow'] == 1) & (
+    #                 self.df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
+    #
+    #         start = time.time()
+    #         # Create new dataframe without rollover events
+    #         self.df1 = self.df.drop(rollover.index)  # Remove rollover events
+    #         self.df1 = self.df1.reset_index(drop=True)  # Reset indices
+    #
+    #         # Identify detection events ('detect') and laser pulse events ('sync')
+    #         detect = self.df1.loc[
+    #             (self.df1['overflow'] == 0) & (
+    #                     self.df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
+    #         sync = self.df1.loc[
+    #             (self.df1['overflow'] == 1) & (
+    #                     self.df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
+    #
+    #         # Ignore detections that precede first laser pulse event
+    #         start_idx = sync.index[0]
+    #         detect = detect[detect.index > start_idx]
+    #
+    #         # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
+    #         sync_times = sync['dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
+    #         detect_times = detect['dtime']
+    #
+    #         counts = np.diff(
+    #             sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
+    #         remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
+    #         counts = np.append(counts, remainder)  # Include last laser shot too
+    #         sync_ref = np.repeat(sync_times,
+    #                              counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
+    #         shots_ref = np.repeat(np.arange(len(sync)), counts)
+    #         shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
+    #
+    #         # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
+    #         detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
+    #
+    #         # Handle rollover events. Add the clock rollover value to any negative timestamps.
+    #         # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
+    #         # This is because if detections occurred between a rollover and sync event, then corresponding "detect_time_rel" element will be negative.
+    #         rollover_idx = np.where(detect_times_rel < 0)[0]
+    #         detect_times_rel[rollover_idx] += self.unwrap_modulo
+    #
+    #         # Convert to flight times and range
+    #         flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
+    #         ranges = flight_times * self.c / 2  # [m]
+    #
+    #         # Save preprocessed data to netCDF
+    #         preprocessed_data = xr.Dataset(
+    #             data_vars=dict(
+    #                 ranges=ranges,
+    #                 shots_time=shots_time
+    #             )
+    #         )
+    #
+    #         preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), self.fname_nc))
+    #
+    #         print('Finished preprocessing. File created.\nTime elapsed: {:.1f} seconds'.format(time.time() - start))
+    #
+    #     return {
+    #         'ranges': ranges,
+    #         'shots_time': shots_time
+    #     }
 
     def gen_histogram(self, preprocessed_results):
         # Load preprocessed data
