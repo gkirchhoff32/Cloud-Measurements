@@ -22,9 +22,9 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
-        self.fname_pkl = None
+        # self.fname_pkl = None
         self.fname_nc = None
-        self.file_path_pkl = None
+        # self.file_path_pkl = None
         self.file_path_nc = None
         self.generic_fname = None
         self.img_save_path = None
@@ -58,48 +58,11 @@ class DataPreprocessor:
         self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background subtracted and range corrected
 
 
-    def load_data(self):
+    def preprocess(self):
         self.generic_fname = Path(self.fname).stem
-        self.fname_pkl = self.generic_fname + '.pkl'
-        self.fname_nc = self.generic_fname + '_preprocessed.nc'
-        self.file_path_pkl = Path(self.data_dir + self.preprocessed_dir) / self.fname_pkl
+        self.fname_nc = self.generic_fname + '.nc'
         self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
 
-        # Search for preexisting preprocessed datafile. Else, create one.
-        if self.file_path_nc.exists():
-            print('\nPreprocessed datafile already exists.')
-        else:
-            print('\nPreprocessed datafile not found. Starting process to create it...\n')
-            # If pickle file does not exist yet, then create it
-            if self.file_path_pkl.exists() == False:
-                print('No existing pickle object found.\nCreating pickle object...')
-                start = time.time()
-
-                # Look at first row to check for headers.
-                headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-                first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
-
-                # Check if first row is all strings or digits. If digits, likely missing the headers.
-                # Can happen when splitting/splicing data files.
-                if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
-                    df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
-                else:
-                    df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
-                    df.columns = headers
-                outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
-                pickle.dump(df, outfile)
-                outfile.close()
-                print('Finished pickling.\nTime elapsed: {:.2f} s'.format(time.time() - start))
-
-            # Unpickle the data to DataFrame
-            print('Pickle file found. Loading...')
-            infile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'rb')
-            self.df = pickle.load(infile)
-            infile.close()
-            print('Finished loading.')
-
-
-    def preprocess(self):
         # Load preprocessed data if exists. Otherwise, preprocess and save out results to .nc file.
         if self.file_path_nc.exists():
             print('\nPreprocessed data file found. Loading data file...')
@@ -109,22 +72,33 @@ class DataPreprocessor:
             print('Preprocessed data file loaded.')
         else:
             print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
-            df = self.df
-            rollover = df.loc[(df['overflow'] == 1) & (
-                    df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
+            # Look at first row to check for headers.
+            headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+            first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+
+            # Check if first row is all strings or digits. If digits, likely missing the headers.
+            # Can happen when splitting/splicing data files.
+            if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
+                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+            else:
+                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
+                self.df.columns = headers
+
+            rollover = self.df.loc[(self.df['overflow'] == 1) & (
+                    self.df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
 
             start = time.time()
             # Create new dataframe without rollover events
-            df1 = df.drop(rollover.index)  # Remove rollover events
-            df1 = df1.reset_index(drop=True)  # Reset indices
+            self.df1 = self.df.drop(rollover.index)  # Remove rollover events
+            self.df1 = self.df1.reset_index(drop=True)  # Reset indices
 
             # Identify detection events ('detect') and laser pulse events ('sync')
-            detect = df1.loc[
-                (df1['overflow'] == 0) & (
-                        df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
-            sync = df1.loc[
-                (df1['overflow'] == 1) & (
-                        df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
+            detect = self.df1.loc[
+                (self.df1['overflow'] == 0) & (
+                        self.df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
+            sync = self.df1.loc[
+                (self.df1['overflow'] == 1) & (
+                        self.df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
 
             # Ignore detections that precede first laser pulse event
             start_idx = sync.index[0]
@@ -136,20 +110,15 @@ class DataPreprocessor:
 
             counts = np.diff(
                 sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
-            # remainder = detect.index[-1] - sync.index[-1]
             remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
             counts = np.append(counts, remainder)  # Include last laser shot too
             sync_ref = np.repeat(sync_times,
                                  counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
-            # shots_ref = np.repeat(sync_ref.index,
-            #                       counts[np.where(counts != 0)][0])  # Repeated laser index array. Each element refers to the laser shot number that corresponds to a detection event.
             shots_ref = np.repeat(np.arange(len(sync)), counts)
             shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
 
             # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
             detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
-            # rel_sync_ref = np.diff(sync_times.values)
-            # print(rel_sync_ref[:25])
 
             # Handle rollover events. Add the clock rollover value to any negative timestamps.
             # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
@@ -172,8 +141,6 @@ class DataPreprocessor:
             preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), self.fname_nc))
 
             print('Finished preprocessing. File created.\nTime elapsed: {:.1f} seconds'.format(time.time() - start))
-
-            self.df1 = df1
 
         return {
             'ranges': ranges,
@@ -297,7 +264,7 @@ def main():
         config = yaml.safe_load(f)
 
     dp = DataPreprocessor(config)
-    dp.load_data()
+    # dp.load_data()
     preprocessed_results = dp.preprocess()
     if dp.histogram:
         histogram_results = dp.gen_histogram(preprocessed_results)
@@ -308,3 +275,44 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# Graveyard
+    # def load_data(self):
+    #     self.generic_fname = Path(self.fname).stem
+    #     self.fname_nc = self.generic_fname + '_preprocessed.nc'
+    #     self.file_path_pkl = Path(self.data_dir + self.preprocessed_dir) / self.fname_pkl
+    #     self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
+    #
+    #     # Search for preexisting preprocessed datafile. Else, create one.
+    #     if self.file_path_nc.exists():
+    #         print('\nPreprocessed datafile already exists.')
+    #     else:
+    #         print('\nPreprocessed datafile not found. Starting process to create it...\n')
+    #         # If pickle file does not exist yet, then create it
+    #         if self.file_path_pkl.exists() == False:
+    #             print('No existing pickle object found.\nCreating pickle object...')
+    #             start = time.time()
+    #
+    #             # Look at first row to check for headers.
+    #             headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+    #             first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+    #
+    #             # Check if first row is all strings or digits. If digits, likely missing the headers.
+    #             # Can happen when splitting/splicing data files.
+    #             if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
+    #                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+    #             else:
+    #                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
+    #                 df.columns = headers
+    #             outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
+    #             pickle.dump(df, outfile)
+    #             outfile.close()
+    #             print('Finished pickling.\nTime elapsed: {:.2f} s'.format(time.time() - start))
+    #
+    #         # Unpickle the data to DataFrame
+    #         print('Pickle file found. Loading...')
+    #         infile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'rb')
+    #         self.df = pickle.load(infile)
+    #         infile.close()
+    #         print('Finished loading.')
