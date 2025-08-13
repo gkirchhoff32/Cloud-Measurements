@@ -11,11 +11,12 @@ file_params:
   # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light\20250805'
   preprocessed_dir: '/../preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/../images/20250805'  # directory where images are saved
-  fname: '/Dev_1_20250805_01.34.27_00.ARSENL'  # main data file name
+  fname: '/Dev_1_-_2025-08-05_01.47.13.ARSENL'  # main data file name
 
 plot_params:
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
+  use_xlim: True  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
   save_img: True  # Set TRUE to save figure out to image directory.
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
@@ -23,9 +24,10 @@ plot_params:
   tbinsize: 3                    # [s] temporal bin size
   rbinsize: 1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
-  ylim: [7.25, 9]                   # [km] y-axis limits if 'use_ylim' is TRUE
+  ylim: [7, 9]                   # [km] y-axis limits if 'use_ylim' is TRUE
+  xlim: [0, 90]  # [s] x-axis limits if 'use_xlim' is TRUE
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.05    # dot size for axes.scatter 's' param (marker size in points**2, according to API).

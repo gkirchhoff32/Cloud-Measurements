@@ -7,7 +7,6 @@ This defines methods that are important for preparing .ARSENL data for processin
 
 import numpy as np
 import time
-import pickle
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import pandas as pd
@@ -48,7 +47,9 @@ class DataPreprocessor:
         self.dpi = config['plot_params']['dpi']                    # dots-per-inch
         self.figsize = config['plot_params']['figsize']            # figure size in inches
         self.use_ylim = config['plot_params']['use_ylim']          # TRUE value activates 'axes.set_ylim' argument
+        self.use_xlim = config['plot_params']['use_xlim']          # TRUE value activates 'axes.set_xlim' argument
         self.ylim = config['plot_params']['ylim']                  # [km] y-axis limits
+        self.xlim = config['plot_params']['xlim']                  # [s] x-axis limits
         self.histogram = config['plot_params']['histogram']        # Plot histogram if TRUE, else scatter plot
         self.save_img = config['plot_params']['save_img']          # Save images if TRUE
         self.save_dpi = config['plot_params']['save_dpi']          # DPI for saved images
@@ -212,6 +213,7 @@ class DataPreprocessor:
         ax.set_ylabel('Range [km]')
         ax.set_title('Scale {:.1f} m x {:.2f} s'.format(self.rbinsize, self.tbinsize))
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.use_xlim else None
         plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
         if self.save_img:
@@ -234,6 +236,7 @@ class DataPreprocessor:
         ax = fig.add_subplot(111)
         ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, linewidths=0)
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.use_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
         ax.set_title('CoBaLT Backscatter')
