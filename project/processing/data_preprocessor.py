@@ -62,31 +62,54 @@ class DataPreprocessor:
         self.fname_nc = self.generic_fname + '.nc'
         self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
 
-        # Load preprocessed data if exists. Otherwise, preprocess and save out results to .nc file.
-        if self.file_path_nc.exists():
-            print('\nPreprocessed data file found. Loading data file...')
-            ds = xr.open_dataset(self.file_path_nc)
-            ranges = ds['ranges']
-            shots_time = ds['shots_time']
-            print('Preprocessed data file loaded.')
-        else:
-            print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
-            # Look at first row to check for headers.
-            headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-            first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+        print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
+        # Look at first row to check for headers.
+        headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+        start_row = 0
+        chunk_num = 0
+        chunksize = 0.1  # [MB]
+        global_start = time.time()
 
-            # Check if first row is all strings or digits. If digits, likely missing the headers.
-            # Can happen when splitting/splicing data files.
-            if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
-                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+        # First estimate how many rows are approximately the chunk size in bytes
+        sample = pd.read_csv(self.data_dir + self.fname, nrows=1000)
+        approx_row_size = sample.memory_usage(index=False, deep=True).sum() / len(sample)
+        print(f"Approx. bytes per row: {approx_row_size}")
+        target_chunk_size_bytes = chunksize*1000 * 1024**2  # 500 MB
+        chunksize_rows = int(target_chunk_size_bytes / approx_row_size)
+        print(f"Rows per chunk: {chunksize_rows}")
+
+        while True:
+            start = time.time()
+
+            # Read an initial chunk
+            if chunk_num == 0:
+                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', skiprows=range(1, start_row + 1),
+                                      nrows=chunksize_rows, dtype=int)
             else:
-                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
-                self.df.columns = headers
+                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', skiprows=range(0, start_row),
+                                      nrows=chunksize_rows, dtype=int, names=headers, header=None)
+                # self.df.columns = headers
+
+            if self.df.empty:
+                break  # done
+
+            sync = self.df.loc[
+                (self.df['overflow'] == 1) & (
+                        self.df['channel'] == 0)]
+
+            if sync.empty:
+                print('Warning: Possible file chunk size too small. Did not find a laser shot event. Please use a larger '
+                      "chunk size if this wasn't last chunk.")
+                break
+            else:
+                # Cut the chunk at the last 1,63 row
+                cut_idx = sync.index[-1] + 1
+                self.df = self.df.iloc[:cut_idx]
 
             rollover = self.df.loc[(self.df['overflow'] == 1) & (
-                    self.df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63) Max count is 2^25-1=33554431
+                    self.df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63)
+            # Max count is 2^25-1=33554431
 
-            start = time.time()
             # Create new dataframe without rollover events
             self.df1 = self.df.drop(rollover.index)  # Remove rollover events
             self.df1 = self.df1.reset_index(drop=True)  # Reset indices
@@ -137,14 +160,20 @@ class DataPreprocessor:
                 )
             )
 
-            preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), self.fname_nc))
+            name, ext = os.path.splitext(self.fname_nc)
+            fname_nc_iter = f"{name}_{chunk_num}{ext}"
+            preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), fname_nc_iter))
 
-            print('Finished preprocessing. File created.\nTime elapsed: {:.1f} seconds'.format(time.time() - start))
+            print('\nPreprocessed #{:.0f} chunk...\nTime elapsed: {:.1f} s'.format(chunk_num, time.time()-start))
+            start_row += len(self.df)
+            chunk_num += 1
 
-        return {
-            'ranges': ranges,
-            'shots_time': shots_time
-        }
+        print('Finished preprocessing. File created.\nTotal time elapsed: {:.1f} seconds'.format(time.time() - global_start))
+
+        # return {
+        #     'ranges': ranges,
+        #     'shots_time': shots_time
+        # }
 
     def gen_histogram(self, preprocessed_results):
         # Load preprocessed data
@@ -265,8 +294,7 @@ def main():
         config = yaml.safe_load(f)
 
     dp = DataPreprocessor(config)
-    # dp.load_data()
-    preprocessed_results = dp.preprocess()
+    dp.preprocess()
     if dp.histogram:
         histogram_results = dp.gen_histogram(preprocessed_results)
         dp.plot_histogram(histogram_results)
