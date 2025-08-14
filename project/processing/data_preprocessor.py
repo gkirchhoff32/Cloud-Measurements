@@ -170,10 +170,10 @@ class DataPreprocessor:
 
         print('Finished preprocessing. File created.\nTotal time elapsed: {:.1f} seconds'.format(time.time() - global_start))
 
-        # return {
-        #     'ranges': ranges,
-        #     'shots_time': shots_time
-        # }
+        return {
+            'ranges': ranges,
+            'shots_time': shots_time
+        }
 
     def gen_histogram(self, preprocessed_results):
         # Load preprocessed data
