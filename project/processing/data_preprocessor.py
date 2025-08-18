@@ -14,6 +14,7 @@ import yaml
 from pathlib import Path
 import xarray as xr
 import os
+import glob
 
 
 class DataPreprocessor:
@@ -25,6 +26,7 @@ class DataPreprocessor:
         self.file_path_nc = None
         self.generic_fname = None
         self.img_save_path = None
+        self.preprocess_path = None
 
         # File params
         self.fname = config['file_params']['fname']                        # File name of raw data
@@ -61,119 +63,135 @@ class DataPreprocessor:
         self.generic_fname = Path(self.fname).stem
         self.fname_nc = self.generic_fname + '.nc'
         self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
+        self.preprocess_path = self.data_dir + self.preprocessed_dir
 
-        print('\nPreprocessed data file not found. Creating file...\nStarting preprocessing...')
-        # Look at first row to check for headers.
-        headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-        start_row = 0
-        chunk_num = 0
-        chunksize = 0.1  # [MB]
-        global_start = time.time()
+        # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
+        if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
+            print('\nPreprocessed data file(s) found. No need to create new one(s)...')
+            # ds = xr.open_dataset(self.file_path_nc)
+            # ranges = ds['ranges']
+            # shots_time = ds['shots_time']
+            # print('Preprocessed data file loaded.')
+        else:
+            print('\nPreprocessed data file(s) not found. Creating file(s)...\nStarting preprocessing...')
+            # Look at first row to check for headers.
+            headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+            start_row = 0
+            chunk_num = 0
+            chunksize = 1  # [MB]
+            global_start = time.time()
+            last_sync = -1  # Track the last shot time per chunk
 
-        # First estimate how many rows are approximately the chunk size in bytes
-        sample = pd.read_csv(self.data_dir + self.fname, nrows=1000)
-        approx_row_size = sample.memory_usage(index=False, deep=True).sum() / len(sample)
-        print(f"Approx. bytes per row: {approx_row_size}")
-        target_chunk_size_bytes = chunksize*1000 * 1024**2  # 500 MB
-        chunksize_rows = int(target_chunk_size_bytes / approx_row_size)
-        print(f"Rows per chunk: {chunksize_rows}")
+            # # First estimate how many rows are approximately the chunk size in bytes
+            # sample = pd.read_csv(self.data_dir + self.fname, nrows=1000)
+            # approx_row_size = sample.memory_usage(index=False, deep=True).sum() / len(sample)
+            # print(f"Approx. bytes per row: {approx_row_size}")
+            # target_chunk_size_bytes = chunksize*1000 * 1024**2
+            # chunksize_rows = int(target_chunk_size_bytes / approx_row_size)
+            # print(f"Rows per chunk: {chunksize_rows}")
 
-        while True:
-            start = time.time()
+            buffer = pd.DataFrame()  # store leftover rows across chunks
 
-            # Read an initial chunk
-            if chunk_num == 0:
-                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', skiprows=range(1, start_row + 1),
-                                      nrows=chunksize_rows, dtype=int)
-            else:
-                self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', skiprows=range(0, start_row),
-                                      nrows=chunksize_rows, dtype=int, names=headers, header=None)
-                # self.df.columns = headers
+            # while True:
+            for chunk in pd.read_csv(self.data_dir + self.fname, delimiter=',', chunksize=50_000_000, dtype=int):
+                start = time.time()
 
-            if self.df.empty:
-                break  # done
+                # self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', skiprows=range(1, start_row + 1),
+                #                       nrows=chunksize_rows, dtype=int)
+                if not buffer.empty:
+                    chunk = pd.concat([buffer, chunk], ignore_index=True)
 
-            sync = self.df.loc[
-                (self.df['overflow'] == 1) & (
-                        self.df['channel'] == 0)]
+                if chunk.empty:
+                    break  # done
 
-            if sync.empty:
-                print('Warning: Possible file chunk size too small. Did not find a laser shot event. Please use a larger '
-                      "chunk size if this wasn't last chunk.")
-                break
-            else:
-                # Cut the chunk at the last 1,63 row
-                cut_idx = sync.index[-1] + 1
-                self.df = self.df.iloc[:cut_idx]
+                sync = chunk.loc[
+                    (chunk['overflow'] == 1) & (
+                            chunk['channel'] == 0)]
 
-            rollover = self.df.loc[(self.df['overflow'] == 1) & (
-                    self.df['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63)
-            # Max count is 2^25-1=33554431
+                if sync.empty:
+                    print('Warning: Possible file chunk size too small. Did not find a laser shot event. Please use a larger '
+                          "chunk size if this wasn't last chunk.")
+                    break
+                elif len(sync) == 1:
+                    # If the sync length is only one, then reached the last laser shot. Finish.
+                    print('No more chunks to process.')
+                    break
+                else:
+                    # Cut the chunk at the last 1,0 (sync event) row
+                    cut_idx = sync.index[-1]
+                    chunk_last_shot = chunk.iloc[:cut_idx]
+                    buffer = chunk.iloc[cut_idx:]
 
-            # Create new dataframe without rollover events
-            self.df1 = self.df.drop(rollover.index)  # Remove rollover events
-            self.df1 = self.df1.reset_index(drop=True)  # Reset indices
+                rollover = chunk_last_shot.loc[(chunk_last_shot['overflow'] == 1) & (
+                        chunk_last_shot['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63)
+                # Max count is 2^25-1=33554431
 
-            # Identify detection events ('detect') and laser pulse events ('sync')
-            detect = self.df1.loc[
-                (self.df1['overflow'] == 0) & (
-                        self.df1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
-            sync = self.df1.loc[
-                (self.df1['overflow'] == 1) & (
-                        self.df1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
+                # Create new dataframe without rollover events
+                chunk1 = chunk_last_shot.drop(rollover.index)  # Remove rollover events
+                chunk1 = chunk1.reset_index(drop=True)  # Reset indices
 
-            # Ignore detections that precede first laser pulse event
-            start_idx = sync.index[0]
-            detect = detect[detect.index > start_idx]
+                # Identify detection events ('detect') and laser pulse events ('sync')
+                detect = chunk1.loc[
+                    (chunk1['overflow'] == 0) & (
+                            chunk1['channel'] == 0)]  # Return data for detection event ("overflow","channel" = 0,0)
+                sync = chunk1.loc[
+                    (chunk1['overflow'] == 1) & (
+                            chunk1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
 
-            # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
-            sync_times = sync['dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
-            detect_times = detect['dtime']
+                if chunk_num == 0:
+                    # Ignore detections that precede first laser pulse event
+                    start_idx = sync.index[0]
+                    detect = detect[detect.index > start_idx]
 
-            counts = np.diff(
-                sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
-            remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
-            counts = np.append(counts, remainder)  # Include last laser shot too
-            sync_ref = np.repeat(sync_times,
-                                 counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
-            shots_ref = np.repeat(np.arange(len(sync)), counts)
-            shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
+                # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
+                sync_times = sync['dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
+                detect_times = detect['dtime']
 
-            # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
-            detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
+                counts = np.diff(
+                    sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
+                remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
+                counts = np.append(counts, remainder)  # Include last laser shot too
+                sync_ref = np.repeat(sync_times,
+                                     counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
+                shots_ref = np.repeat(np.arange(start=last_sync+1, stop=(last_sync+1)+len(sync)), counts)
+                last_sync = shots_ref[-1]  # Track last sync event
+                shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
 
-            # Handle rollover events. Add the clock rollover value to any negative timestamps.
-            # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
-            # This is because if detections occurred between a rollover and sync event, then corresponding "detect_time_rel" element will be negative.
-            rollover_idx = np.where(detect_times_rel < 0)[0]
-            detect_times_rel[rollover_idx] += self.unwrap_modulo
+                # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
+                detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
 
-            # Convert to flight times and range
-            flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
-            ranges = flight_times * self.c / 2  # [m]
+                # Handle rollover events. Add the clock rollover value to any negative timestamps.
+                # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
+                # This is because if detections occurred between a rollover and sync event, then corresponding "detect_time_rel" element will be negative.
+                rollover_idx = np.where(detect_times_rel < 0)[0]
+                detect_times_rel[rollover_idx] += self.unwrap_modulo
 
-            # Save preprocessed data to netCDF
-            preprocessed_data = xr.Dataset(
-                data_vars=dict(
-                    ranges=ranges,
-                    shots_time=shots_time
+                # Convert to flight times and range
+                flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
+                ranges = flight_times * self.c / 2  # [m]
+
+                # Save preprocessed data to netCDF
+                preprocessed_data = xr.Dataset(
+                    data_vars=dict(
+                        ranges=ranges,
+                        shots_time=shots_time
+                    )
                 )
-            )
 
-            name, ext = os.path.splitext(self.fname_nc)
-            fname_nc_iter = f"{name}_{chunk_num}{ext}"
-            preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), fname_nc_iter))
+                name, ext = os.path.splitext(self.fname_nc)
+                fname_nc_iter = f"{name}_{chunk_num}{ext}"
+                preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), fname_nc_iter))
 
-            print('\nPreprocessed #{:.0f} chunk...\nTime elapsed: {:.1f} s'.format(chunk_num, time.time()-start))
-            start_row += len(self.df)
-            chunk_num += 1
+                start_row += len(chunk_last_shot)
+                chunk_num += 1
+                print('\nPreprocessed #{:.0f} chunk...\nTime elapsed: {:.1f} s'.format(chunk_num, time.time() - start))
 
-        print('Finished preprocessing. File created.\nTotal time elapsed: {:.1f} seconds'.format(time.time() - global_start))
+            print('Finished preprocessing. File created.\nTotal time elapsed: {:.1f} seconds'.format(time.time() - global_start))
 
-        return {
-            'ranges': ranges,
-            'shots_time': shots_time
-        }
+        # return {
+        #     'ranges': ranges,
+        #     'shots_time': shots_time
+        # }
 
     def gen_histogram(self, preprocessed_results):
         # Load preprocessed data
@@ -252,10 +270,31 @@ class DataPreprocessor:
             fig.savefig(fname, dpi=self.save_dpi)
         plt.show()
 
-    def plot_scatter(self, preprocessed_results):
+    def plot_scatter(self):
         # Load preprocessed data
-        ranges = preprocessed_results['ranges']
-        shots_time = preprocessed_results['shots_time']
+        # ranges = preprocessed_results['ranges']
+        # shots_time = preprocessed_results['shots_time']
+
+        ranges_tot = []
+        shots_time_tot = []
+        chunk = 0
+        while True:
+            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+            if glob.glob(file_path):
+                print(f'\nPreprocessed file found: chunk #{chunk}')
+                ds = xr.open_dataset(file_path)
+                # ranges = ds['ranges']
+                # shots_time = ds['shots_time']
+                ranges_tot.append(ds['ranges'])
+                shots_time_tot.append(ds['shots_time'])
+                print('\nFile loaded.')
+                chunk += 1
+            else:
+                print('\nNo more chunks. Starting to plot...')
+                break
+
+        ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
+        shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
 
         # Start plotting
         print('\nStarting to generate scatter plot...')
@@ -272,10 +311,13 @@ class DataPreprocessor:
         plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
         if self.save_img:
+            print('Starting to save image...')
+            start = time.time()
             img_fname = self.generic_fname + '_scatter' + '.png'
             self.img_save_path = Path(self.data_dir + self.image_dir) / img_fname
             fname = self.get_unique_filename(self.img_save_path)
             fig.savefig(fname, dpi=self.save_dpi)
+            print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
         plt.show()
 
     def get_unique_filename(self, filename):
@@ -299,7 +341,7 @@ def main():
         histogram_results = dp.gen_histogram(preprocessed_results)
         dp.plot_histogram(histogram_results)
     else:
-        dp.plot_scatter(preprocessed_results)
+        dp.plot_scatter()
 
 
 if __name__ == '__main__':
