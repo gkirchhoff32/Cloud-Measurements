@@ -33,6 +33,7 @@ class DataPreprocessor:
         self.data_dir = config['file_params']['data_dir']                  # Directory of raw data
         self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
         self.image_dir = config['file_params']['image_dir']                # Directory to save images
+        self.date = config['file_params']['date']                          # YYYYMMDD: points to identically named directories
 
         # System Params
         self.PRF = config['system_params']['PRF']                      # [Hz] laser repetition rate
@@ -57,13 +58,15 @@ class DataPreprocessor:
         self.save_dpi = config['plot_params']['save_dpi']          # DPI for saved images
         self.dot_size = config['plot_params']['dot_size']          # Dot size for 'axes.scatter' 's' param
         self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background subtracted and range corrected
+        self.chunk_start = config['plot_params']['chunk_start']    # Chunk to start plotting from
+        self.chunk_num = config['plot_params']['chunk_num']        # Number of chunks to plot. If exceeds remaining chunks, then it will plot the available ones
 
 
     def preprocess(self):
         self.generic_fname = Path(self.fname).stem
         self.fname_nc = self.generic_fname + '.nc'
-        self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
-        self.preprocess_path = self.data_dir + self.preprocessed_dir
+        self.preprocess_path = self.data_dir + self.preprocessed_dir + self.date
+        self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
 
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
@@ -75,29 +78,17 @@ class DataPreprocessor:
         else:
             print('\nPreprocessed data file(s) not found. Creating file(s)...\nStarting preprocessing...')
             # Look at first row to check for headers.
-            headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-            start_row = 0
-            chunk_num = 0
-            chunksize = 1  # [MB]
-            global_start = time.time()
+            # headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+            chunk_iter = 0
             last_sync = -1  # Track the last shot time per chunk
 
-            # # First estimate how many rows are approximately the chunk size in bytes
-            # sample = pd.read_csv(self.data_dir + self.fname, nrows=1000)
-            # approx_row_size = sample.memory_usage(index=False, deep=True).sum() / len(sample)
-            # print(f"Approx. bytes per row: {approx_row_size}")
-            # target_chunk_size_bytes = chunksize*1000 * 1024**2
-            # chunksize_rows = int(target_chunk_size_bytes / approx_row_size)
-            # print(f"Rows per chunk: {chunksize_rows}")
-
             buffer = pd.DataFrame()  # store leftover rows across chunks
+            start = time.time()
+            time_update = [start]  # List to store elapsed times after each chunk is processed
 
-            # while True:
-            for chunk in pd.read_csv(self.data_dir + self.fname, delimiter=',', chunksize=50_000_000, dtype=int):
-                start = time.time()
+            for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=50_000_000,
+                                     dtype=int, on_bad_lines='warn', encoding_errors='ignore'):
 
-                # self.df = pd.read_csv(self.data_dir + self.fname, delimiter=',', skiprows=range(1, start_row + 1),
-                #                       nrows=chunksize_rows, dtype=int)
                 if not buffer.empty:
                     chunk = pd.concat([buffer, chunk], ignore_index=True)
 
@@ -138,7 +129,7 @@ class DataPreprocessor:
                     (chunk1['overflow'] == 1) & (
                             chunk1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
 
-                if chunk_num == 0:
+                if chunk_iter == 0:
                     # Ignore detections that precede first laser pulse event
                     start_idx = sync.index[0]
                     detect = detect[detect.index > start_idx]
@@ -162,7 +153,8 @@ class DataPreprocessor:
 
                 # Handle rollover events. Add the clock rollover value to any negative timestamps.
                 # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
-                # This is because if detections occurred between a rollover and sync event, then corresponding "detect_time_rel" element will be negative.
+                # This is because if detections occurred between a rollover and sync event, then corresponding
+                # "detect_time_rel" element will be negative.
                 rollover_idx = np.where(detect_times_rel < 0)[0]
                 detect_times_rel[rollover_idx] += self.unwrap_modulo
 
@@ -179,21 +171,20 @@ class DataPreprocessor:
                 )
 
                 name, ext = os.path.splitext(self.fname_nc)
-                fname_nc_iter = f"{name}_{chunk_num}{ext}"
-                preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir), fname_nc_iter))
+                fname_nc_iter = f"{name}_{chunk_iter}{ext}"
+                preprocessed_data.to_netcdf(os.path.join((self.data_dir + self.preprocessed_dir + self.date),
+                                                         fname_nc_iter))
 
-                start_row += len(chunk_last_shot)
-                chunk_num += 1
-                print('\nPreprocessed #{:.0f} chunk...\nTime elapsed: {:.1f} s'.format(chunk_num, time.time() - start))
+                chunk_iter += 1
+                time_end_chunk = time.time()
+                print('\nPreprocessed #{:.0f} chunk...\n'
+                      'Time elapsed: {:.1f} s'.format(chunk_iter, time_end_chunk - time_update[-1]))
+                time_update.append(time_end_chunk)
 
-            print('Finished preprocessing. File created.\nTotal time elapsed: {:.1f} seconds'.format(time.time() - global_start))
+            print('Finished preprocessing. File created.\n'
+                  'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
 
-        # return {
-        #     'ranges': ranges,
-        #     'shots_time': shots_time
-        # }
-
-    def gen_histogram(self, preprocessed_results):
+    def gen_histogram(self):
         # Load preprocessed data
         ranges = preprocessed_results['ranges']
         shots_time = preprocessed_results['shots_time']
@@ -206,7 +197,8 @@ class DataPreprocessor:
         H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # Generate 2D histogram
         H = H.T  # flip axes
         flux = H / (self.rbinsize / self.c * 2) / (
-                self.tbinsize * self.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$, where $\Phi$ is flux, $n$ is photon counts, $N$ is laser shots number, and $\Delta t$ is range resolution.
+                self.tbinsize * self.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$, 
+        # where $\Phi$ is flux, $n$ is photon counts, $N$ is laser shots number, and $\Delta t$ is range resolution.
 
         # Estimate background flux
         bg_edges_idx = [np.argmin(np.abs(rbins - self.bg_edges[0])), np.argmin(np.abs(rbins - self.bg_edges[1]))]
@@ -265,33 +257,32 @@ class DataPreprocessor:
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
         if self.save_img:
             img_fname = self.generic_fname + '_hg' + '.png'
-            self.img_save_path = Path(self.data_dir + self.image_dir) / img_fname
+            self.img_save_path = Path(self.data_dir + self.image_dir + self.date) / img_fname
             fname = self.get_unique_filename(self.img_save_path)
             fig.savefig(fname, dpi=self.save_dpi)
         plt.show()
 
     def plot_scatter(self):
-        # Load preprocessed data
-        # ranges = preprocessed_results['ranges']
-        # shots_time = preprocessed_results['shots_time']
-
         ranges_tot = []
         shots_time_tot = []
-        chunk = 0
-        while True:
+        chunk = self.chunk_start
+        # while True:
+        for i in range(self.chunk_num):
             file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
             if glob.glob(file_path):
                 print(f'\nPreprocessed file found: chunk #{chunk}')
                 ds = xr.open_dataset(file_path)
-                # ranges = ds['ranges']
-                # shots_time = ds['shots_time']
                 ranges_tot.append(ds['ranges'])
                 shots_time_tot.append(ds['shots_time'])
                 print('\nFile loaded.')
                 chunk += 1
             else:
-                print('\nNo more chunks. Starting to plot...')
-                break
+                if chunk == self.chunk_start:
+                    print('Starting chunk unavailable! Pick a different one.')
+                    quit()
+                else:
+                    print('\nNo more chunks. Starting to plot...')
+                    break
 
         ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
@@ -314,7 +305,7 @@ class DataPreprocessor:
             print('Starting to save image...')
             start = time.time()
             img_fname = self.generic_fname + '_scatter' + '.png'
-            self.img_save_path = Path(self.data_dir + self.image_dir) / img_fname
+            self.img_save_path = Path(self.data_dir + self.image_dir + self.date) / img_fname
             fname = self.get_unique_filename(self.img_save_path)
             fig.savefig(fname, dpi=self.save_dpi)
             print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
