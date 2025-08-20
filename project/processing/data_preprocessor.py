@@ -71,14 +71,9 @@ class DataPreprocessor:
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
             print('\nPreprocessed data file(s) found. No need to create new one(s)...')
-            # ds = xr.open_dataset(self.file_path_nc)
-            # ranges = ds['ranges']
-            # shots_time = ds['shots_time']
-            # print('Preprocessed data file loaded.')
         else:
             print('\nPreprocessed data file(s) not found. Creating file(s)...\nStarting preprocessing...')
             # Look at first row to check for headers.
-            # headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
             chunk_iter = 0
             last_sync = -1  # Track the last shot time per chunk
 
@@ -100,8 +95,8 @@ class DataPreprocessor:
                             chunk['channel'] == 0)]
 
                 if sync.empty:
-                    print('Warning: Possible file chunk size too small. Did not find a laser shot event. Please use a larger '
-                          "chunk size if this wasn't last chunk.")
+                    print('Warning: Possible file chunk size too small. Did not find a laser shot event. Please use a '
+                          "larger chunk size if this wasn't the last chunk.")
                     break
                 elif len(sync) == 1:
                     # If the sync length is only one, then reached the last laser shot. Finish.
@@ -139,11 +134,14 @@ class DataPreprocessor:
                 detect_times = detect['dtime']
 
                 counts = np.diff(
-                    sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in np.diff operation)
-                remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there is zero remainder.
+                    sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in
+                # np.diff operation)
+                remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there
+                # is zero remainder.
                 counts = np.append(counts, remainder)  # Include last laser shot too
                 sync_ref = np.repeat(sync_times,
-                                     counts)  # Repeated sync time array that stores the corresponding timestamp of the laser event. Each element has a corresponding detection event.
+                                     counts)  # Repeated sync time array that stores the corresponding timestamp of the
+                # laser event. Each element has a corresponding detection event.
                 shots_ref = np.repeat(np.arange(start=last_sync+1, stop=(last_sync+1)+len(sync)), counts)
                 last_sync = shots_ref[-1]  # Track last sync event
                 shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
@@ -206,7 +204,8 @@ class DataPreprocessor:
         flux_bg_sub = flux - bg_flux  # [Hz] flux with background subtracted
 
         rbins_centers = (r_binedges + 0.5*(r_binedges[1]-r_binedges[0]))[:-1]
-        flux_corrected = flux_bg_sub * (rbins_centers**2)[:, np.newaxis]  # [Hz m^2] range corrected flux (after bg subtraction)
+        flux_corrected = flux_bg_sub * (rbins_centers**2)[:, np.newaxis]  # [Hz m^2] range corrected flux (after bg
+        # subtraction)
 
         # TODO: range correct (R**2). Maybe make bg and range corrections a separate function?
 
@@ -238,7 +237,8 @@ class DataPreprocessor:
         ax = fig.add_subplot(111)
         if self.flux_correct:
             mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
-                             norm=LogNorm(vmin=bg_flux*((self.bg_edges[0]+self.bg_edges[1])/2)**2, vmax=flux_corrected.max()))
+                                 norm=LogNorm(vmin=bg_flux*((self.bg_edges[0]+self.bg_edges[1])/2)**2,
+                                              vmax=flux_corrected.max()))
             fig.suptitle('CoBaLT Range-Corrected Backscatter Flux')
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Range-Corrected Flux [Hz m^2]')
