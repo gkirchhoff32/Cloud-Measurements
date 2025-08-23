@@ -183,9 +183,28 @@ class DataPreprocessor:
                   'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
 
     def gen_histogram(self):
-        # Load preprocessed data
-        ranges = preprocessed_results['ranges']
-        shots_time = preprocessed_results['shots_time']
+        ranges_tot = []
+        shots_time_tot = []
+        chunk = self.chunk_start
+        for i in range(self.chunk_num):
+            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+            if glob.glob(file_path):
+                print(f'\nPreprocessed file found: chunk #{chunk}')
+                ds = xr.open_dataset(file_path)
+                ranges_tot.append(ds['ranges'])
+                shots_time_tot.append(ds['shots_time'])
+                print('\nFile loaded.')
+                chunk += 1
+            else:
+                if chunk == self.chunk_start:
+                    print('Starting chunk unavailable! Pick a different one.')
+                    quit()
+                else:
+                    print('\nNo more chunks. Starting to plot...')
+                    break
+
+        ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
+        shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
 
         print('\nStarting to generate histogram...')
         start = time.time()
@@ -223,7 +242,6 @@ class DataPreprocessor:
     def plot_histogram(self, histogram_results):
         # Processed data
         flux_raw = histogram_results['flux_raw']
-        flux_bg_sub = histogram_results['flux_bg_sub']        # [Hz] backscatter flux
         flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
         bg_flux = histogram_results['bg_flux']                # [Hz] background flux
         t_binedges = histogram_results['t_binedges']          # [s] temporal bin edges
@@ -244,7 +262,7 @@ class DataPreprocessor:
             cbar.set_label('Range-Corrected Flux [Hz m^2]')
         else:
             mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_raw, cmap='viridis',
-                             norm=LogNorm(vmin=bg_flux, vmax=flux_raw.max()))
+                             norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(), vmax=flux_raw.max()))
             fig.suptitle('CoBaLT Backscatter Flux')
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Flux [Hz]')
@@ -266,7 +284,6 @@ class DataPreprocessor:
         ranges_tot = []
         shots_time_tot = []
         chunk = self.chunk_start
-        # while True:
         for i in range(self.chunk_num):
             file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
             if glob.glob(file_path):
@@ -329,7 +346,7 @@ def main():
     dp = DataPreprocessor(config)
     dp.preprocess()
     if dp.histogram:
-        histogram_results = dp.gen_histogram(preprocessed_results)
+        histogram_results = dp.gen_histogram()
         dp.plot_histogram(histogram_results)
     else:
         dp.plot_scatter()
