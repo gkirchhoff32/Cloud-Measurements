@@ -7,13 +7,13 @@ system_params:
   PRF: 14200                 # [Hz] laser repetition rate
 
 file_params:
-  date: '/20250805'  # YYYYMMDD. Will search for and save files in the identically named directories. 
+  date: '/20250804'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
-  # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
-  data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
+  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-08-05_01.34.27.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-08-05_01.55.43.ARSENL'  # main data file name
 
 plot_params:
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 

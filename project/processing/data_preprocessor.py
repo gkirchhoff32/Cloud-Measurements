@@ -81,14 +81,24 @@ class DataPreprocessor:
             start = time.time()
             time_update = [start]  # List to store elapsed times after each chunk is processed
 
-            for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=50_000_000,
-                                     dtype=int, on_bad_lines='warn', encoding_errors='ignore'):
+            cols_read = ['overflow', 'channel', 'dtime']
+
+            for chunk in pd.read_csv(self.data_dir + self.date + self.fname, usecols=cols_read, delimiter=',', chunksize=50_000_000,
+                                     dtype=str, encoding_errors='ignore'):
 
                 if not buffer.empty:
                     chunk = pd.concat([buffer, chunk], ignore_index=True)
 
                 if chunk.empty:
                     break  # done
+
+                # for col in cols_read:
+                #     chunk[col] = pd.to_numeric(chunk[col], errors='coerce', downcast='integer')
+                before = len(chunk)
+                chunk[cols_read] = chunk[cols_read].apply(pd.to_numeric, errors='coerce',
+                                                          downcast='integer')
+                chunk = chunk.dropna(subset=cols_read)
+                print('Dropped rows: {}'.format(before - len(chunk)))
 
                 sync = chunk.loc[
                     (chunk['overflow'] == 1) & (
