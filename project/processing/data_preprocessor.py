@@ -294,6 +294,7 @@ class DataPreprocessor:
                 print('\nFile loaded.')
                 chunk += 1
             else:
+                print(f'\nPreprocessed file not found... check this')
                 if chunk == self.chunk_start:
                     print('Starting chunk unavailable! Pick a different one.')
                     quit()

@@ -1,5 +1,5 @@
 # Virtual environments
-arsenl/
+arsenl_venv/
 .env/
 
 # Python cache
@@ -18,3 +18,9 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Data in case
+*.nc
+*.ARSENL
+*.png
+*.csv
