@@ -82,7 +82,7 @@ class DataPreprocessor:
             time_update = [start]  # List to store elapsed times after each chunk is processed
 
             for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=50_000_000,
-                                     dtype=int, on_bad_lines='warn', encoding_errors='ignore'):
+                                     dtype=int, on_bad_lines='skip', encoding_errors='ignore'):
 
                 if not buffer.empty:
                     chunk = pd.concat([buffer, chunk], ignore_index=True)
