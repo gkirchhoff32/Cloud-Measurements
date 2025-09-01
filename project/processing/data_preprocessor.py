@@ -185,6 +185,7 @@ class DataPreprocessor:
     def gen_histogram(self):
         ranges_tot = []
         shots_time_tot = []
+        shots_time_max = 320
         chunk = self.chunk_start
         for i in range(self.chunk_num):
             file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
@@ -205,6 +206,10 @@ class DataPreprocessor:
 
         ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
+
+        max_shots_idx = np.argmin(np.abs(shots_time - shots_time_max))
+        ranges = ranges[:max_shots_idx]
+        shots_time = shots_time[:max_shots_idx]
 
         print('\nStarting to generate histogram...')
         start = time.time()

@@ -13,23 +13,23 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_1_-_2025-08-05_02.14.22.ARSENL'  # main data file name
+  fname: '/Dev_1_-_2025-08-05_02.26.56.ARSENL'  # main data file name
 
 plot_params:
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
-  use_xlim: True  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
+  use_xlim: False  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
   save_img: False  # Set TRUE to save figure out to image directory.
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
   exclude: [0, 70.0e-6]          # [s] temporal window bounds
-  tbinsize: 0.1                    # [s] temporal bin size
-  rbinsize: 50                  # [m] range bin size
+  tbinsize: 10                    # [s] temporal bin size
+  rbinsize: 1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
   ylim: [7, 9]                   # [km] y-axis limits if 'use_ylim' is TRUE
-  xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  chunk_start: 4  # Starting chunk when plotting chunks (0 indexed)
-  chunk_num: 4  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
+  xlim: [0, 45]  # [s] x-axis limits if 'use_xlim' is TRUE
+  chunk_start: 0  # Starting chunk when plotting chunks (0 indexed)
+  chunk_num: 1  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
