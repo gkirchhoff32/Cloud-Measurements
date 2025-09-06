@@ -34,21 +34,40 @@ histogram_results_lg = dp_lg.gen_histogram()
 flg = histogram_results_lg['flux_raw']  # [Hz] raw low-gain flux value histogrammed
 fhg = histogram_results_hg['flux_raw']  # [Hz] raw high-gain flux value histogrammed
 
+# Pad to largest dimensions if needed
+nr_lg, nt_lg = flg.shape
+nr_hg, nt_hg = fhg.shape
+
+Nt = max(nt_lg, nt_hg)
+Nr = max(nr_lg, nr_hg)
+if (nr_lg != nr_hg) or (nt_lg != nt_hg):
+    print('\nDimension mismatch! Added zero pads.')
+    A = np.zeros((Nr, Nt), dtype=float)
+    B = np.zeros((Nr, Nt), dtype=float)
+    A[:nr_lg, :nt_lg] = flg
+    B[:nr_hg, :nt_hg] = fhg
+    flg = A
+    fhg = B
+
 # TODO: Zero pad to avoid dimension mismatching
 
 t_binedges = histogram_results_lg['t_binedges']  # [s] bin edges for time axis of histogram
 r_binedges = histogram_results_lg['r_binedges']  # [m] bin edges for range axis of histogram
 dt = np.diff(t_binedges)[0]  # [s] time resolution
 dr = np.diff(r_binedges)[0]  # [m] range resolution
-t_centers = t_binedges[:-1] + 0.5 * dt  # [s] values of bin centers for time axis
-r_centers = r_binedges[:-1] + 0.5 * dr  # [m] values of bin centers for range axis
-nt = len(t_centers)
-nr = len(r_centers)
+# t_centers = t_binedges[:-1] + 0.5 * dt  # [s] values of bin centers for time axis
+# r_centers = r_binedges[:-1] + 0.5 * dr  # [m] values of bin centers for range axis
+# nt = len(t_centers)
+# nr = len(r_centers)
+
+nt = Nt
+nr = Nr
 
 Flg = np.fft.fft2(flg)  # [Hz] DFT of low-gain flux
 Fhg = np.fft.fft2(fhg)  # [Hz] DFT of high-gain flux
 
-R = (Flg * np.conj(Fhg)) / (np.abs(Flg * np.conj(Fhg)))  # Phase conjugate
+eps = 1e-12  # small number to avoid divide by zero
+R = (Flg * np.conj(Fhg)) / (np.abs(Flg * np.conj(Fhg)) + eps)  # Phase conjugate
 
 r = np.fft.ifft2(R)
 r = np.fft.fftshift(r)
