@@ -21,8 +21,8 @@ with open(config_path) as f:
 
 dp_hg = DataPreprocessor(config)
 dp_lg = DataPreprocessor(config)
-dp_hg.fname = r'/Dev_0_-_2025-08-05_02.14.22.ARSENL'
-dp_lg.fname = r'/Dev_1_-_2025-08-05_02.14.22.ARSENL'
+dp_hg.fname = r'/Dev_0_-_2025-08-05_21.16.39.ARSENL'
+dp_lg.fname = r'/Dev_1_-_2025-08-05_21.16.39.ARSENL'
 dp_lg.chunk_start = 0
 dp_hg.preprocess()
 dp_lg.preprocess()
@@ -30,47 +30,42 @@ histogram_results_hg = dp_hg.gen_histogram()
 histogram_results_lg = dp_lg.gen_histogram()
 # dp_hg.plot_histogram(histogram_results_hg)
 # dp_lg.plot_histogram(histogram_results_lg)
+# quit()
 
 flg = histogram_results_lg['flux_raw']  # [Hz] raw low-gain flux value histogrammed
 fhg = histogram_results_hg['flux_raw']  # [Hz] raw high-gain flux value histogrammed
 
-# Pad to largest dimensions if needed
-nr_lg, nt_lg = flg.shape
-nr_hg, nt_hg = fhg.shape
-
-Nt = max(nt_lg, nt_hg)
-Nr = max(nr_lg, nr_hg)
-if (nr_lg != nr_hg) or (nt_lg != nt_hg):
-    print('\nDimension mismatch! Added zero pads.')
-    A = np.zeros((Nr, Nt), dtype=float)
-    B = np.zeros((Nr, Nt), dtype=float)
-    A[:nr_lg, :nt_lg] = flg
-    B[:nr_hg, :nt_hg] = fhg
-    flg = A
-    fhg = B
-
-# TODO: Zero pad to avoid dimension mismatching
-
+print('Checking times...')
+start = time.time()
 t_binedges = histogram_results_lg['t_binedges']  # [s] bin edges for time axis of histogram
 r_binedges = histogram_results_lg['r_binedges']  # [m] bin edges for range axis of histogram
-dt = np.diff(t_binedges)[0]  # [s] time resolution
-dr = np.diff(r_binedges)[0]  # [m] range resolution
-# t_centers = t_binedges[:-1] + 0.5 * dt  # [s] values of bin centers for time axis
-# r_centers = r_binedges[:-1] + 0.5 * dr  # [m] values of bin centers for range axis
-# nt = len(t_centers)
-# nr = len(r_centers)
+# dt = np.diff(t_binedges)[0]  # [s] time resolution
+# dr = np.diff(r_binedges)[0]  # [m] range resolution
+dt = t_binedges[1] - t_binedges[0]  # [s] time resolution
+dr = r_binedges[1] - r_binedges[0]  # [m] range resolution
+t_centers = t_binedges[:-1] + 0.5 * dt  # [s] values of bin centers for time axis
+r_centers = r_binedges[:-1] + 0.5 * dr  # [m] values of bin centers for range axis
+nt = len(t_centers)
+nr = len(r_centers)
+print('Loading & calculating bin edges time: {} s'.format(time.time()-start))
 
-nt = Nt
-nr = Nr
+# nt = Nt
+# nr = Nr
 
+print('Checking fft times...')
+start = time.time()
 Flg = np.fft.fft2(flg)  # [Hz] DFT of low-gain flux
 Fhg = np.fft.fft2(fhg)  # [Hz] DFT of high-gain flux
+print('First ffts: {} s'.format(time.time()-start))
 
+start = time.time()
 eps = 1e-12  # small number to avoid divide by zero
 R = (Flg * np.conj(Fhg)) / (np.abs(Flg * np.conj(Fhg)) + eps)  # Phase conjugate
 
 r = np.fft.ifft2(R)
 r = np.fft.fftshift(r)
+print('Correlation calculation: {} s'.format(time.time()-start))
+print('\nCalculated phase correlation shift.')
 
 # Create histogram bin axes
 t_shift_axis = np.arange(-(nt // 2 + 1), nt // 2 + 1, 1) + 0.5  # [pix] shifted by 0.5 to be the centers of histogram bins
@@ -92,9 +87,9 @@ r_shift = r_shift_pix * dr  # [m]
 # r_abs = np.abs(r)
 r_abs = np.flip(np.abs(r), axis=(0, 1))  # Absolute value and mirror each axis
 
-print('\nPrecisions: Range {:.2e} m and Time {:.5e} s'.format(dr, dt))
+print('\nPrecisions: Range {:.2e} m and Time {:.3e} s'.format(dr, dt))
 print("\nEstimated shift in range: {} pix ({:.2e} m)".format(r_shift_pix, r_shift))
-print("\nEstimated shift in time: {} pix  ({:.5e} s)".format(t_shift_pix, t_shift))
+print("\nEstimated shift in time: {} pix  ({:.7e} s)".format(t_shift_pix, t_shift))
 
 # Now smooth the correlation map to denoise
 
@@ -114,12 +109,13 @@ t_shift_smooth = t_shift_pix_smooth * dt  # [s]
 r_shift_smooth = r_shift_pix_smooth * dr  # [m]
 
 print("\nEstimated shift in range (smoothed): {} pix ({:.2e} m)".format(r_shift_pix_smooth, r_shift_smooth))
-print("\nEstimated shift in time (smoothed): {} pix  ({:.5e} s)".format(t_shift_pix_smooth, t_shift_smooth))
+print("\nEstimated shift in time (smoothed): {} pix  ({:.7e} s)".format(t_shift_pix_smooth, t_shift_smooth))
 
 
 fig = plt.figure(dpi=300, figsize=(4, 2))
 ax = fig.add_subplot(111)
-mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs, norm=LogNorm(vmin=r_abs.min(), vmax=r_abs.max()))
+# mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs, norm=LogNorm(vmin=r_abs.min(), vmax=r_abs.max()))
+mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs)
 ax.set_xlabel('Time shift [s]')
 ax.set_ylabel('Range shift [m]')
 ax.set_title('Phase Correlation (No Smoothing)')
@@ -132,7 +128,8 @@ plt.show()
 
 fig = plt.figure(dpi=300, figsize=(4, 2))
 ax = fig.add_subplot(111)
-mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs_smooth, norm=LogNorm(vmin=r_abs_smooth.min(), vmax=r_abs_smooth.max()))
+# mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs_smooth, norm=LogNorm(vmin=r_abs_smooth.min(), vmax=r_abs_smooth.max()))
+mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs_smooth)
 ax.set_xlabel('Time shift [s]')
 ax.set_ylabel('Range shift [m]')
 ax.set_title('Phase Correlation (Smoothing)')

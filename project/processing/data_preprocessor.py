@@ -185,7 +185,11 @@ class DataPreprocessor:
     def gen_histogram(self):
         ranges_tot = []
         shots_time_tot = []
-        shots_time_max = 320
+
+        min_time = 0  # [s] set min horizontal time window value for histogram
+        max_time = 150  # [s] set max horizontal time window value for histogram
+        min_range = 0  # [m] set min vertical range window value for histogram
+        max_range = 10e3  # [m] set max vertical range window value for histogram
         chunk = self.chunk_start
         for i in range(self.chunk_num):
             file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
@@ -207,14 +211,17 @@ class DataPreprocessor:
         ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
 
-        max_shots_idx = np.argmin(np.abs(shots_time - shots_time_max))
-        ranges = ranges[:max_shots_idx]
-        shots_time = shots_time[:max_shots_idx]
+        max_shots_idx = np.argmin(np.abs(shots_time - max_time))
+        min_shots_idx = np.argmin(np.abs(shots_time - min_time))
+        ranges = ranges[min_shots_idx:max_shots_idx]
+        shots_time = shots_time[min_shots_idx:max_shots_idx]
 
         print('\nStarting to generate histogram...')
         start = time.time()
-        tbins = np.arange(0, shots_time[-1], self.tbinsize)  # [s]
-        rbins = np.arange(0, self.c / 2 / self.PRF, self.rbinsize)  # [m]
+        # tbins = np.arange(shots_time[0], shots_time[-1], self.tbinsize)  # [s]
+        tbins = np.arange(min_time, max_time, self.tbinsize)  # [s]
+        # rbins = np.arange(0, self.c / 2 / self.PRF, self.rbinsize)  # [m]
+        rbins = np.arange(min_range, max_range, self.rbinsize)  # [m]
 
         H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # Generate 2D histogram
         H = H.T  # flip axes
