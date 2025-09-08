@@ -7,29 +7,29 @@ system_params:
   PRF: 14200                 # [Hz] laser repetition rate
 
 file_params:
-  date: '/20250804'  # YYYYMMDD. Will search for and save files in the identically named directories. 
+  date: '/20250805'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
   data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_1_-_2025-08-05_01.47.13.ARSENL'  # main data file name
+  fname: '/Dev_1_-_2025-08-05_21.16.39.ARSENL'  # main data file name
 
 plot_params:
-  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
-  use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
-  use_xlim: True  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
+  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  use_ylim: False   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
+  use_xlim: False  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
   save_img: False  # Set TRUE to save figure out to image directory.
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
   exclude: [0, 70.0e-6]          # [s] temporal window bounds
-  tbinsize: 0.1                    # [s] temporal bin size
+  tbinsize: 0.001                    # [s] temporal bin size
   rbinsize: 50                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
   ylim: [7, 9]                   # [km] y-axis limits if 'use_ylim' is TRUE
-  xlim: [200, 370]  # [s] x-axis limits if 'use_xlim' is TRUE
+  xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
   chunk_start: 0  # Starting chunk when plotting chunks (0 indexed)
-  chunk_num: 1  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
+  chunk_num: 4  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
