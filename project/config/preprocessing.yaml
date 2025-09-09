@@ -13,7 +13,7 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-08-05_02.14.22.ARSENL'  # main data file name
+  fname: '/Dev_1_-_2025-08-05_01.47.13.ARSENL'  # main data file name
 
 plot_params:
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 

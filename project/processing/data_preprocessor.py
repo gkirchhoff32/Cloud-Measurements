@@ -124,6 +124,11 @@ class DataPreprocessor:
                     (chunk1['overflow'] == 1) & (
                             chunk1['channel'] == 0)]  # sync detection (laser pulse) ("overflow", "channel" = 1,0)
 
+                # sec = chunk1['sec']
+                # usec = chunk1['usec']
+                # print('First "sec" values: {}'.format(sec))
+                # print('First "usec" values: {}'.format(usec))
+
                 if chunk_iter == 0:
                     # Ignore detections that precede first laser pulse event
                     start_idx = sync.index[0]
@@ -132,6 +137,8 @@ class DataPreprocessor:
                 # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
                 sync_times = sync['dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
                 detect_times = detect['dtime']
+
+                print(len(sync_times))
 
                 counts = np.diff(
                     sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is included in
