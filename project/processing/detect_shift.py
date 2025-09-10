@@ -119,8 +119,8 @@ mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs)
 ax.set_xlabel('Time shift [s]')
 ax.set_ylabel('Range shift [m]')
 ax.set_title('Phase Correlation (No Smoothing)')
-# ax.set_xlim([-2.6, -2.5])
-# ax.set_ylim([-1000, 1000])
+ax.set_xlim([-2.75, -2.70])  # [s]
+ax.set_ylim([-75, 75])  # [m]
 cbar = fig.colorbar(mesh, ax=ax)
 cbar.set_label('Correlation strength')
 plt.tight_layout()
@@ -133,8 +133,8 @@ mesh = ax.pcolormesh(t_shift_axis_scale, r_shift_axis_scale, r_abs_smooth)
 ax.set_xlabel('Time shift [s]')
 ax.set_ylabel('Range shift [m]')
 ax.set_title('Phase Correlation (Smoothing)')
-# ax.set_xlim([-2.6, -2.5])
-# ax.set_ylim([-1000, 1000])
+ax.set_xlim([-2.75, -2.70])  # [s]
+ax.set_ylim([-75, 75])  # [m]
 cbar = fig.colorbar(mesh, ax=ax)
 cbar.set_label('Correlation strength (smoothed)')
 plt.tight_layout()
