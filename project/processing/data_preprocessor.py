@@ -194,7 +194,7 @@ class DataPreprocessor:
         shots_time_tot = []
 
         min_time = 0  # [s] set min horizontal time window value for histogram
-        max_time = 150  # [s] set max horizontal time window value for histogram
+        max_time = 50  # [s] set max horizontal time window value for histogram
         min_range = 0  # [m] set min vertical range window value for histogram
         max_range = 10e3  # [m] set max vertical range window value for histogram
         chunk = self.chunk_start
