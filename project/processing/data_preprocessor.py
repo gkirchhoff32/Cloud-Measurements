@@ -186,17 +186,24 @@ class DataPreprocessor:
                       'Time elapsed: {:.1f} s'.format(chunk_iter, time_end_chunk - time_update[-1]))
                 time_update.append(time_end_chunk)
 
+                # print('Total shot count: {}'.format(last_sync))
+
             print('Finished preprocessing. File created.\n'
                   'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
+
 
     def gen_histogram(self):
         ranges_tot = []
         shots_time_tot = []
 
-        min_time = 0  # [s] set min horizontal time window value for histogram
-        max_time = 50  # [s] set max horizontal time window value for histogram
-        min_range = 0  # [m] set min vertical range window value for histogram
-        max_range = 10e3  # [m] set max vertical range window value for histogram
+        # min_time = 0  # [s] set min horizontal time window value for histogram
+        # max_time = 50  # [s] set max horizontal time window value for histogram
+        # min_range = 0  # [m] set min vertical range window value for histogram
+        # max_range = 10e3  # [m] set max vertical range window value for histogram
+        min_time = self.xlim[0]  # [s]
+        max_time = self.xlim[1]  # [s]
+        min_range = self.ylim[0] * 1e3  # [m]
+        max_range = self.ylim[1] * 1e3  # [m]
         chunk = self.chunk_start
         for i in range(self.chunk_num):
             file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
