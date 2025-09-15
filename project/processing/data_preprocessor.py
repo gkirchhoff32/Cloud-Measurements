@@ -22,6 +22,7 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
+        self.last_sync_tot = None
         self.fname_nc = None
         self.file_path_nc = None
         self.generic_fname = None
@@ -43,6 +44,9 @@ class DataPreprocessor:
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
 
+        # Process params
+        self.time_delay_correct = config['process_params']['time_delay_correct']
+
         # Plot params
         self.tbinsize = config['plot_params']['tbinsize']          # [s] temporal bin size
         self.rbinsize = config['plot_params']['rbinsize']          # [m] range bin size
@@ -61,6 +65,7 @@ class DataPreprocessor:
         self.chunk_start = config['plot_params']['chunk_start']    # Chunk to start plotting from
         self.chunk_num = config['plot_params']['chunk_num']        # Number of chunks to plot. If exceeds remaining chunks, then it will plot the available ones
 
+    # TODO: Create function for loading chunks
 
     def preprocess(self):
         self.generic_fname = Path(self.fname).stem
@@ -69,8 +74,27 @@ class DataPreprocessor:
         self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
 
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
+        self.last_sync_tot = []
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
             print('\nPreprocessed data file(s) found. No need to create new one(s)...')
+            # Load chunks to locate last sync value
+            chunk = self.chunk_start
+            for i in range(self.chunk_num):
+                file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+                if glob.glob(file_path):
+                    print(f'\nPreprocessed file found: chunk #{chunk}')
+                    ds = xr.open_dataset(file_path)
+                    self.last_sync_tot.append(ds.last_sync)
+                    print('\nFile loaded.')
+                    chunk += 1
+                else:
+                    print(f'\nPreprocessed file not found... check this')
+                    if chunk == self.chunk_start:
+                        print('Starting chunk unavailable! Pick a different one.')
+                        quit()
+                    else:
+                        print('\nNo more chunks. Starting to plot...')
+                        break
         else:
             print('\nPreprocessed data file(s) not found. Creating file(s)...\nStarting preprocessing...')
             # Look at first row to check for headers.
@@ -112,6 +136,15 @@ class DataPreprocessor:
                         chunk_last_shot['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63)
                 # Max count is 2^25-1=33554431
 
+                if self.time_delay_correct:
+                    sync_idx = sync.index
+                    gaps = sync_idx.to_series().diff().fillna(1)
+                    gap_end_idx = gaps.idxmax()
+                    start_idx = gap_end_idx  # first laser shot after end of calibration gap
+
+                    chunk_last_shot = chunk_last_shot.loc[start_idx:]
+                    # TODO: Ended here Grant 09.15.25. Need to remove rollover events that precede gap
+
                 # Create new dataframe without rollover events
                 chunk1 = chunk_last_shot.drop(rollover.index)  # Remove rollover events
                 chunk1 = chunk1.reset_index(drop=True)  # Reset indices
@@ -152,6 +185,7 @@ class DataPreprocessor:
                 shots_ref = np.repeat(np.arange(start=last_sync+1, stop=(last_sync+1)+len(sync)), counts)
                 last_sync = shots_ref[-1]  # Track last sync event
                 shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
+                self.last_sync_tot.append(len(sync))
 
                 # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
                 detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
@@ -171,7 +205,8 @@ class DataPreprocessor:
                 preprocessed_data = xr.Dataset(
                     data_vars=dict(
                         ranges=ranges,
-                        shots_time=shots_time
+                        shots_time=shots_time,
+                        last_sync=last_sync
                     )
                 )
 
