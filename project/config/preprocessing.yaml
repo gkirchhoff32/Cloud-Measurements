@@ -7,18 +7,21 @@ system_params:
   PRF: 14200                 # [Hz] laser repetition rate
 
 file_params:
-  date: '/Timing and Range Tests/range_test'  # YYYYMMDD. Will search for and save files in the identically named directories. 
+  date: '/20250913'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
   data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-09-11_18.06.18.ARSENL'  # main data file name
+  fname: '/Dev_1_-_2025-09-13_21.47.46.ARSENL'  # main data file name
+
+process_params:
+  time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
 
 plot_params:
-  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
-  use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
-  use_xlim: True  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  use_ylim: False   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
+  use_xlim: False  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
   save_img: False  # Set TRUE to save figure out to image directory.
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
@@ -37,4 +40,4 @@ plot_params:
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.05    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.001    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
