@@ -74,6 +74,26 @@ def gen_histogram(dp):
         'flux_raw': flux
     }
 
+def cross_correlate(sig_1, sig_2):
+    eps = 1e-12  # small value to avoid dividing by zero
+    Sig_1 = np.fft.fft(sig_1)
+    Sig_2 = np.fft.fft(sig_2)
+    phase_corr = Sig_1 * np.conj(Sig_2) / (np.abs(Sig_1 * np.conj(Sig_2)) + eps)  # 1D phase correlator
+    xcorr_sig = np.fft.ifft(phase_corr)
+    xcorr_sig = np.fft.fftshift(xcorr_sig)
+    xcorr_sig = np.abs(xcorr_sig)  # can take absolute value since imaginary components are negligible
+
+    return xcorr_sig
+
+def loc_max(xcorr_sig_tot, shift_ranges):
+    # Locate maximum in cross-correlation result
+    max_idx = np.argmax(xcorr_sig_tot, axis=0)
+    max_rshift = shift_ranges[max_idx]
+    # mean_rshift = np.mean(max_rshift)
+    # stdev_rshift = np.std(max_rshift, ddof=1)
+
+    return max_rshift
+
 def main():
     """
     Start by loading data and creating histograms. Make sure histograms integrate the hard-target region in time over
@@ -94,20 +114,36 @@ def main():
 
     # Start cross-correlation operation and bootstrap resample to generate empirical spread in results.
     n_rbins, n_frames = g1_orig.shape
-    nboot = 4000
-    eps = 1e-12  # small value to avoid dividing by zero
-    xcorr_sig_tot = np.zeros((n_rbins, nboot))
+    nboot = 20000
+    xcorr_sig_val_tot = np.zeros((n_rbins, nboot))
+    xcorr_sig_test_tot = np.zeros((n_rbins, nboot))
     for i in range(nboot):
-        rep_idx = np.random.randint(0, n_frames, size=n_frames)
-        g1 = g1_orig[:, rep_idx].sum(axis=1)
-        g2 = g2_orig[:, rep_idx].sum(axis=1)
-        G1 = np.fft.fft(g1)
-        G2 = np.fft.fft(g2)
-        phase_corr = G1 * np.conj(G2) / (np.abs(G1 * np.conj(G2)) + eps)  # 1D phase correlator
-        xcorr_sig = np.fft.ifft(phase_corr)
-        xcorr_sig = np.fft.fftshift(xcorr_sig)
-        xcorr_sig = np.abs(xcorr_sig)  # can take absolute value since imaginary components are negligible
-        xcorr_sig_tot[:, i] = xcorr_sig
+        rand_idx = np.random.permutation(n_frames)
+        half_nframes = n_frames // 2
+        idx_val = rand_idx[:half_nframes]
+        idx_test = rand_idx[half_nframes:]
+
+        g1_val = g1_orig[:, idx_val].sum(axis=1)
+        g2_val = g2_orig[:, idx_val].sum(axis=1)
+        g1_test = g1_orig[:, idx_test].sum(axis=1)
+        g2_test = g2_orig[:, idx_test].sum(axis=1)
+
+        xcorr_sig_val = cross_correlate(g1_val, g2_val)
+        xcorr_sig_test = cross_correlate(g1_test, g2_test)
+
+        xcorr_sig_val_tot[:, i] = xcorr_sig_val
+        xcorr_sig_test_tot[:, i] = xcorr_sig_test
+
+        # rep_idx = np.random.randint(0, n_frames, size=n_frames)
+        # g1 = g1_orig[:, rep_idx].sum(axis=1)
+        # g2 = g2_orig[:, rep_idx].sum(axis=1)
+        # G1 = np.fft.fft(g1)
+        # G2 = np.fft.fft(g2)
+        # phase_corr = G1 * np.conj(G2) / (np.abs(G1 * np.conj(G2)) + eps)  # 1D phase correlator
+        # xcorr_sig = np.fft.ifft(phase_corr)
+        # xcorr_sig = np.fft.fftshift(xcorr_sig)
+        # xcorr_sig = np.abs(xcorr_sig)  # can take absolute value since imaginary components are negligible
+
 
     # Generate cross-correlation axis
     r_binedges = histogram_results_lg['r_binedges']  # [m]
@@ -118,30 +154,40 @@ def main():
     shift_ranges = shift_pix * dr  # [m]
 
     # Locate maximum in cross-correlation result
-    max_idx = np.argmax(xcorr_sig_tot, axis=0)
-    max_rshift = shift_ranges[max_idx]
-    mean_rshift = np.mean(max_rshift)
-    stdev_rshift = np.std(max_rshift, ddof=1)
+    max_rshift_val = loc_max(xcorr_sig_val_tot, shift_ranges)
+    max_rshift_test = loc_max(xcorr_sig_test_tot, shift_ranges)
+
+    residual = max_rshift_val - max_rshift_test
+    stdev_rshift = np.sqrt(np.sum(residual**2) / (len(max_rshift_val) - 1))
+    # mean_rshift_val = np.mean(max_rshift_val)
+    mean_rshift_test = np.mean(max_rshift_test)
+
+
+    # max_idx_val = np.argmax(xcorr_sig_val_tot, axis=0)
+    # max_rshift_val = shift_ranges[max_idx_val]
+    # mean_rshift_val = np.mean(max_rshift_val)
+    # stdev_rshift_val = np.std(max_rshift_val, ddof=1)
 
     # Plot bootstrapped cross-correlation results.
     gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2])
     fig = plt.figure(figsize=(8, 4), dpi=400)
     ax1 = fig.add_subplot(gs[0])
-    ax1.plot(max_rshift, range(nboot), '.', markersize=1)
-    ax1.axvline(x=mean_rshift, linestyle='--', label='Mean')
-    ax1.axvline(x=mean_rshift+stdev_rshift, linestyle='--', color='red', label='$\pm\sigma$')
-    ax1.axvline(x=mean_rshift-stdev_rshift, linestyle='--', color='red')
+    ax1.plot(max_rshift_val, range(nboot), '.', markersize=1, label='Val')
+    ax1.plot(max_rshift_test, range(nboot), '.', markersize=1, label='Test')
+    ax1.axvline(x=mean_rshift_test, linestyle='--', label='Mean')
+    ax1.axvline(x=mean_rshift_test+stdev_rshift, linestyle='--', color='red', label='$\pm\sigma$')
+    ax1.axvline(x=mean_rshift_test-stdev_rshift, linestyle='--', color='red')
     ax1.set_ylabel('Bootstrap Sample')
     ax1.set_xlabel('Estimated Shift [m]')
-    ax1.set_title('Shift Estimates\nRange Shift Avg: {:.3f} m\nRange Shift StDev: {:.3f} m'.format(mean_rshift, stdev_rshift))
+    ax1.set_title('Shift Estimates\nRange Shift Avg: {:.3f} m\nRange Shift StDev: {:.3f} m'.format(mean_rshift_test, stdev_rshift))
     ax1.legend()
     ax2 = fig.add_subplot(gs[1])
     for i in range(nboot):
-        ax2.plot(shift_ranges, xcorr_sig_tot[:, i], '.', markersize=1, alpha=0.2)
-    ax2.axvline(x=mean_rshift, linestyle='--', label='Mean', alpha=0.5)
+        ax2.plot(shift_ranges, xcorr_sig_test_tot[:, i], '.', markersize=1, alpha=0.2)
+    ax2.axvline(x=mean_rshift_test, linestyle='--', label='Mean', alpha=0.5)
     ax2.set_xlabel('Range shift [m]')
     ax2.set_ylabel('Correlation strength')
-    ax2.set_title('Cross-Correlation: {:.3f} m precision\nRange Shift Average: {:.3f} m'.format(dr, mean_rshift))
+    ax2.set_title('Cross-Correlation: {:.3f} m precision\nRange Shift Average: {:.3f} m'.format(dr, mean_rshift_test))
     plt.tight_layout()
     plt.show()
 
