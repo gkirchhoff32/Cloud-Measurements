@@ -22,50 +22,76 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
-        self.last_sync_tot = None
+        # self.last_sync_tot = None
         self.fname_nc = None
         self.file_path_nc = None
         self.generic_fname = None
         self.img_save_path = None
         self.preprocess_path = None
+        self.ranges_tot = []
+        self.shots_time_tot = []
 
         # File params
-        self.fname = config['file_params']['fname']                        # File name of raw data
-        self.data_dir = config['file_params']['data_dir']                  # Directory of raw data
+        self.fname = config['file_params']['fname']  # File name of raw data
+        self.data_dir = config['file_params']['data_dir']  # Directory of raw data
         self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
-        self.image_dir = config['file_params']['image_dir']                # Directory to save images
-        self.date = config['file_params']['date']                          # YYYYMMDD: points to identically named directories
+        self.image_dir = config['file_params']['image_dir']  # Directory to save images
+        self.date = config['file_params']['date']  # YYYYMMDD: points to identically named directories
 
         # System Params
-        self.PRF = config['system_params']['PRF']                      # [Hz] laser repetition rate
+        self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
         self.unwrap_modulo = config['system_params']['unwrap_modulo']  # clock rollover count
-        self.clock_res = config['system_params']['clock_res']          # [s] clock resolution
+        self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
 
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
 
         # Process params
         self.time_delay_correct = config['process_params']['time_delay_correct']
+        self.range_shift_correct = config['process_params']['range_shift_correct']
+        self.range_shift = config['process_params']['range_shift']
 
         # Plot params
-        self.tbinsize = config['plot_params']['tbinsize']          # [s] temporal bin size
-        self.rbinsize = config['plot_params']['rbinsize']          # [m] range bin size
-        self.bg_edges = config['plot_params']['bg_edges']          # [m] range background window
-        self.dpi = config['plot_params']['dpi']                    # dots-per-inch
-        self.figsize = config['plot_params']['figsize']            # figure size in inches
-        self.use_ylim = config['plot_params']['use_ylim']          # TRUE value activates 'axes.set_ylim' argument
-        self.use_xlim = config['plot_params']['use_xlim']          # TRUE value activates 'axes.set_xlim' argument
-        self.ylim = config['plot_params']['ylim']                  # [km] y-axis limits
-        self.xlim = config['plot_params']['xlim']                  # [s] x-axis limits
-        self.histogram = config['plot_params']['histogram']        # Plot histogram if TRUE, else scatter plot
-        self.save_img = config['plot_params']['save_img']          # Save images if TRUE
-        self.save_dpi = config['plot_params']['save_dpi']          # DPI for saved images
-        self.dot_size = config['plot_params']['dot_size']          # Dot size for 'axes.scatter' 's' param
-        self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background subtracted and range corrected
-        self.chunk_start = config['plot_params']['chunk_start']    # Chunk to start plotting from
-        self.chunk_num = config['plot_params']['chunk_num']        # Number of chunks to plot. If exceeds remaining chunks, then it will plot the available ones
+        self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
+        self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
+        self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
+        self.dpi = config['plot_params']['dpi']  # dots-per-inch
+        self.figsize = config['plot_params']['figsize']  # figure size in inches
+        self.use_ylim = config['plot_params']['use_ylim']  # TRUE value activates 'axes.set_ylim' argument
+        self.use_xlim = config['plot_params']['use_xlim']  # TRUE value activates 'axes.set_xlim' argument
+        self.ylim = config['plot_params']['ylim']  # [km] y-axis limits
+        self.xlim = config['plot_params']['xlim']  # [s] x-axis limits
+        self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE, else scatter plot
+        self.save_img = config['plot_params']['save_img']  # Save images if TRUE
+        self.save_dpi = config['plot_params']['save_dpi']  # DPI for saved images
+        self.dot_size = config['plot_params']['dot_size']  # Dot size for 'axes.scatter' 's' param
+        self.flux_correct = config['plot_params'][
+            'flux_correct']  # TRUE will plot flux that has been background subtracted and range corrected
+        self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
+        self.chunk_num = config['plot_params'][
+            'chunk_num']  # Number of chunks to plot. If exceeds remaining chunks, then it will plot the available ones
 
     # TODO: Create function for loading chunks
+
+    def load_chunk(self):
+        chunk = self.chunk_start
+        for i in range(self.chunk_num):
+            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+            if glob.glob(file_path):
+                print(f'\nPreprocessed file found: chunk #{chunk}')
+                ds = xr.open_dataset(file_path)
+                self.ranges_tot.append(ds['ranges'])
+                self.shots_time_tot.append(ds['shots_time'])
+                print('\nFile loaded.')
+                chunk += 1
+            else:
+                print(f'\nPreprocessed file not found... check this')
+                if chunk == self.chunk_start:
+                    print('Starting chunk unavailable! Pick a different one.')
+                    quit()
+                else:
+                    print('\nNo more chunks. Starting to plot...')
+                    break
 
     def preprocess(self):
         self.generic_fname = Path(self.fname).stem
@@ -74,27 +100,9 @@ class DataPreprocessor:
         self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
 
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
-        self.last_sync_tot = []
+        # self.last_sync_tot = []
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
             print('\nPreprocessed data file(s) found. No need to create new one(s)...')
-            # Load chunks to locate last sync value
-            chunk = self.chunk_start
-            for i in range(self.chunk_num):
-                file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
-                if glob.glob(file_path):
-                    print(f'\nPreprocessed file found: chunk #{chunk}')
-                    ds = xr.open_dataset(file_path)
-                    self.last_sync_tot.append(ds.last_sync)
-                    print('\nFile loaded.')
-                    chunk += 1
-                else:
-                    print(f'\nPreprocessed file not found... check this')
-                    if chunk == self.chunk_start:
-                        print('Starting chunk unavailable! Pick a different one.')
-                        quit()
-                    else:
-                        print('\nNo more chunks. Starting to plot...')
-                        break
         else:
             print('\nPreprocessed data file(s) not found. Creating file(s)...\nStarting preprocessing...')
             # Look at first row to check for headers.
@@ -132,18 +140,45 @@ class DataPreprocessor:
                     chunk_last_shot = chunk.iloc[:cut_idx]
                     buffer = chunk.iloc[cut_idx:]
 
+                # If this is the starting chunk, then remove calibration section from data
+                if (chunk_iter == 0) and (self.time_delay_correct == True):
+                    sync_idx = sync.index
+                    gaps = sync_idx.to_series().diff().fillna(1)
+                    gap_start_idx = gaps.index[gaps.values.argmax() - 1]  # last laser shot before beginning of cal gap
+                    cal_sync = sync.loc[:gap_start_idx]  # cut everything past the beginning calibration section
+                    cal_shot_num = len(cal_sync)
+
+                    # If this is the low-gain data, then measure time delay using calibration section from high-gain data too
+                    if "Dev_1" in self.fname:
+                        # Load small first chunk of high-gain file too
+                        hg_fname = self.fname.replace("Dev_1", "Dev_0")  # high-gain filename
+                        chunk_hg = next(
+                            pd.read_csv(self.data_dir + self.date + hg_fname, delimiter=',', chunksize=5_000_000,
+                                        dtype=int, on_bad_lines='skip', encoding_errors='ignore'))
+                        sync_hg = chunk_hg.loc[
+                            (chunk_hg['overflow'] == 1) & (
+                                    chunk_hg['channel'] == 0)]
+                        sync_hg_idx = sync_hg.index
+                        gaps_hg = sync_hg_idx.to_series().diff().fillna(1)
+                        gap_start_idx_hg = gaps_hg.index[gaps_hg.values.argmax() - 1]
+                        cal_sync_hg = sync_hg.loc[
+                                      :gap_start_idx_hg]  # cut everything past the beginning calibration section
+                        cal_shot_num_hg = len(cal_sync_hg)
+
+                        shot_diff = cal_shot_num - cal_shot_num_hg
+                        time_diff = shot_diff / self.PRF  # [s]
+                        print('Time diff between channels: {} s'.format(time_diff))
+                    else:
+                        shot_diff = None
+
+                    gap_end_idx = gaps.idxmax()  # first laser shot after end of calibration gap
+                    chunk_last_shot = chunk_last_shot.loc[gap_end_idx:]
+
+                    # TODO: Incorporate range shift correction
+
                 rollover = chunk_last_shot.loc[(chunk_last_shot['overflow'] == 1) & (
                         chunk_last_shot['channel'] == 63)]  # Clock rollover ("overflow", "channel" = 1,63)
                 # Max count is 2^25-1=33554431
-
-                if self.time_delay_correct:
-                    sync_idx = sync.index
-                    gaps = sync_idx.to_series().diff().fillna(1)
-                    gap_end_idx = gaps.idxmax()
-                    start_idx = gap_end_idx  # first laser shot after end of calibration gap
-
-                    chunk_last_shot = chunk_last_shot.loc[start_idx:]
-                    # TODO: Ended here Grant 09.15.25. Need to remove rollover events that precede gap
 
                 # Create new dataframe without rollover events
                 chunk1 = chunk_last_shot.drop(rollover.index)  # Remove rollover events
@@ -163,7 +198,8 @@ class DataPreprocessor:
                     detect = detect[detect.index > start_idx]
 
                 # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
-                sync_times = sync['dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
+                sync_times = sync[
+                    'dtime']  # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
                 detect_times = detect['dtime']
 
                 counts = np.diff(
@@ -175,10 +211,10 @@ class DataPreprocessor:
                 sync_ref = np.repeat(sync_times,
                                      counts)  # Repeated sync time array that stores the corresponding timestamp of the
                 # laser event. Each element has a corresponding detection event.
-                shots_ref = np.repeat(np.arange(start=last_sync+1, stop=(last_sync+1)+len(sync)), counts)
+                shots_ref = np.repeat(np.arange(start=last_sync + 1, stop=(last_sync + 1) + len(sync)), counts)
                 last_sync = shots_ref[-1]  # Track last sync event
                 shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
-                self.last_sync_tot.append(len(sync))
+                # self.last_sync_tot.append(len(sync))
 
                 # Convert detection absolute                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
                 detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
@@ -194,12 +230,16 @@ class DataPreprocessor:
                 flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
                 ranges = flight_times * self.c / 2  # [m]
 
+                # Shift range on high-gain channel based on channel path-length difference
+                if (self.range_shift_correct == True) and ("Dev_0" in self.fname):
+                    ranges += self.range_shift  # [m]
+
                 # Save preprocessed data to netCDF
                 preprocessed_data = xr.Dataset(
                     data_vars=dict(
                         ranges=ranges,
                         shots_time=shots_time,
-                        last_sync=last_sync
+                        shot_diff=shot_diff
                     )
                 )
 
@@ -219,39 +259,16 @@ class DataPreprocessor:
             print('Finished preprocessing. File created.\n'
                   'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
 
-
     def gen_histogram(self):
-        ranges_tot = []
-        shots_time_tot = []
-
-        # min_time = 0  # [s] set min horizontal time window value for histogram
-        # max_time = 50  # [s] set max horizontal time window value for histogram
-        # min_range = 0  # [m] set min vertical range window value for histogram
-        # max_range = 10e3  # [m] set max vertical range window value for histogram
         min_time = self.xlim[0]  # [s]
         max_time = self.xlim[1]  # [s]
         min_range = self.ylim[0] * 1e3  # [m]
         max_range = self.ylim[1] * 1e3  # [m]
-        chunk = self.chunk_start
-        for i in range(self.chunk_num):
-            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
-            if glob.glob(file_path):
-                print(f'\nPreprocessed file found: chunk #{chunk}')
-                ds = xr.open_dataset(file_path)
-                ranges_tot.append(ds['ranges'])
-                shots_time_tot.append(ds['shots_time'])
-                print('\nFile loaded.')
-                chunk += 1
-            else:
-                if chunk == self.chunk_start:
-                    print('Starting chunk unavailable! Pick a different one.')
-                    quit()
-                else:
-                    print('\nNo more chunks. Starting to plot...')
-                    break
 
-        ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
-        shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
+        self.load_chunk()
+
+        ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
+        shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
         max_shots_idx = np.argmin(np.abs(shots_time - max_time))
         min_shots_idx = np.argmin(np.abs(shots_time - min_time))
@@ -276,8 +293,8 @@ class DataPreprocessor:
         bg_flux = np.mean(flux[bg_edges_idx[0]:bg_edges_idx[1], :])
         flux_bg_sub = flux - bg_flux  # [Hz] flux with background subtracted
 
-        rbins_centers = (r_binedges + 0.5*(r_binedges[1]-r_binedges[0]))[:-1]
-        flux_corrected = flux_bg_sub * (rbins_centers**2)[:, np.newaxis]  # [Hz m^2] range corrected flux (after bg
+        rbins_centers = (r_binedges + 0.5 * (r_binedges[1] - r_binedges[0]))[:-1]
+        flux_corrected = flux_bg_sub * (rbins_centers ** 2)[:, np.newaxis]  # [Hz m^2] range corrected flux (after bg
         # subtraction)
 
         # TODO: range correct (R**2). Maybe make bg and range corrections a separate function?
@@ -297,9 +314,9 @@ class DataPreprocessor:
         # Processed data
         flux_raw = histogram_results['flux_raw']
         flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
-        bg_flux = histogram_results['bg_flux']                # [Hz] background flux
-        t_binedges = histogram_results['t_binedges']          # [s] temporal bin edges
-        r_binedges = histogram_results['r_binedges']          # [m] range bin edges
+        bg_flux = histogram_results['bg_flux']  # [Hz] background flux
+        t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
+        r_binedges = histogram_results['r_binedges']  # [m] range bin edges
 
         # Start plotting
         print('\nStarting to generate histogram plot...')
@@ -309,14 +326,14 @@ class DataPreprocessor:
         ax = fig.add_subplot(111)
         if self.flux_correct:
             mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
-                                 norm=LogNorm(vmin=bg_flux*((self.bg_edges[0]+self.bg_edges[1])/2)**2,
+                                 norm=LogNorm(vmin=bg_flux * ((self.bg_edges[0] + self.bg_edges[1]) / 2) ** 2,
                                               vmax=flux_corrected.max()))
             fig.suptitle('CoBaLT Range-Corrected Backscatter Flux')
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Range-Corrected Flux [Hz m^2]')
         else:
             mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_raw, cmap='viridis',
-                             norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(), vmax=flux_raw.max()))
+                                 norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(), vmax=flux_raw.max()))
             fig.suptitle('CoBaLT Backscatter Flux')
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Flux [Hz]')
@@ -326,7 +343,7 @@ class DataPreprocessor:
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.use_xlim else None
         plt.tight_layout()
-        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
+        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             img_fname = self.generic_fname + '_hg' + '.png'
             self.img_save_path = Path(self.data_dir + self.image_dir + self.date) / img_fname
@@ -335,29 +352,10 @@ class DataPreprocessor:
         plt.show()
 
     def plot_scatter(self):
-        ranges_tot = []
-        shots_time_tot = []
-        chunk = self.chunk_start
-        for i in range(self.chunk_num):
-            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
-            if glob.glob(file_path):
-                print(f'\nPreprocessed file found: chunk #{chunk}')
-                ds = xr.open_dataset(file_path)
-                ranges_tot.append(ds['ranges'])
-                shots_time_tot.append(ds['shots_time'])
-                print('\nFile loaded.')
-                chunk += 1
-            else:
-                print(f'\nPreprocessed file not found... check this')
-                if chunk == self.chunk_start:
-                    print('Starting chunk unavailable! Pick a different one.')
-                    quit()
-                else:
-                    print('\nNo more chunks. Starting to plot...')
-                    break
+        self.load_chunk()
 
-        ranges = np.concatenate([da.values.ravel() for da in ranges_tot])
-        shots_time = np.concatenate([da.values.ravel() for da in shots_time_tot])
+        ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
+        shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
         # Start plotting
         print('\nStarting to generate scatter plot...')
@@ -372,7 +370,7 @@ class DataPreprocessor:
         ax.set_ylabel('Range [km]')
         ax.set_title('CoBaLT Backscatter')
         plt.tight_layout()
-        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
+        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             print('Starting to save image...')
             start = time.time()
@@ -380,7 +378,7 @@ class DataPreprocessor:
             self.img_save_path = Path(self.data_dir + self.image_dir + self.date) / img_fname
             fname = self.get_unique_filename(self.img_save_path)
             fig.savefig(fname, dpi=self.save_dpi)
-            print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time()-start))
+            print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         plt.show()
 
     def get_unique_filename(self, filename):
@@ -410,43 +408,42 @@ def main():
 if __name__ == '__main__':
     main()
 
-
 # Graveyard
-    # def load_data(self):
-    #     self.generic_fname = Path(self.fname).stem
-    #     self.fname_nc = self.generic_fname + '_preprocessed.nc'
-    #     self.file_path_pkl = Path(self.data_dir + self.preprocessed_dir) / self.fname_pkl
-    #     self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
-    #
-    #     # Search for preexisting preprocessed datafile. Else, create one.
-    #     if self.file_path_nc.exists():
-    #         print('\nPreprocessed datafile already exists.')
-    #     else:
-    #         print('\nPreprocessed datafile not found. Starting process to create it...\n')
-    #         # If pickle file does not exist yet, then create it
-    #         if self.file_path_pkl.exists() == False:
-    #             print('No existing pickle object found.\nCreating pickle object...')
-    #             start = time.time()
-    #
-    #             # Look at first row to check for headers.
-    #             headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-    #             first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
-    #
-    #             # Check if first row is all strings or digits. If digits, likely missing the headers.
-    #             # Can happen when splitting/splicing data files.
-    #             if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
-    #                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
-    #             else:
-    #                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
-    #                 df.columns = headers
-    #             outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
-    #             pickle.dump(df, outfile)
-    #             outfile.close()
-    #             print('Finished pickling.\nTime elapsed: {:.2f} s'.format(time.time() - start))
-    #
-    #         # Unpickle the data to DataFrame
-    #         print('Pickle file found. Loading...')
-    #         infile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'rb')
-    #         self.df = pickle.load(infile)
-    #         infile.close()
-    #         print('Finished loading.')
+# def load_data(self):
+#     self.generic_fname = Path(self.fname).stem
+#     self.fname_nc = self.generic_fname + '_preprocessed.nc'
+#     self.file_path_pkl = Path(self.data_dir + self.preprocessed_dir) / self.fname_pkl
+#     self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
+#
+#     # Search for preexisting preprocessed datafile. Else, create one.
+#     if self.file_path_nc.exists():
+#         print('\nPreprocessed datafile already exists.')
+#     else:
+#         print('\nPreprocessed datafile not found. Starting process to create it...\n')
+#         # If pickle file does not exist yet, then create it
+#         if self.file_path_pkl.exists() == False:
+#             print('No existing pickle object found.\nCreating pickle object...')
+#             start = time.time()
+#
+#             # Look at first row to check for headers.
+#             headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
+#             first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
+#
+#             # Check if first row is all strings or digits. If digits, likely missing the headers.
+#             # Can happen when splitting/splicing data files.
+#             if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
+#                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
+#             else:
+#                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
+#                 df.columns = headers
+#             outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
+#             pickle.dump(df, outfile)
+#             outfile.close()
+#             print('Finished pickling.\nTime elapsed: {:.2f} s'.format(time.time() - start))
+#
+#         # Unpickle the data to DataFrame
+#         print('Pickle file found. Loading...')
+#         infile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'rb')
+#         self.df = pickle.load(infile)
+#         infile.close()
+#         print('Finished loading.')
