@@ -22,7 +22,6 @@ class DataPreprocessor:
         self.config = config
         self.df = None
         self.df1 = None
-        # self.last_sync_tot = None
         self.fname_nc = None
         self.file_path_nc = None
         self.generic_fname = None
@@ -65,15 +64,19 @@ class DataPreprocessor:
         self.save_img = config['plot_params']['save_img']  # Save images if TRUE
         self.save_dpi = config['plot_params']['save_dpi']  # DPI for saved images
         self.dot_size = config['plot_params']['dot_size']  # Dot size for 'axes.scatter' 's' param
-        self.flux_correct = config['plot_params'][
-            'flux_correct']  # TRUE will plot flux that has been background subtracted and range corrected
+        self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background
+        # subtracted and range corrected
         self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
-        self.chunk_num = config['plot_params'][
-            'chunk_num']  # Number of chunks to plot. If exceeds remaining chunks, then it will plot the available ones
-
-    # TODO: Create function for loading chunks
+        self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
+        # then it will plot the available ones
 
     def load_chunk(self):
+        """
+        When .ARSENL datasets are too large, the preprocessor method will save the necessary DataArray variables to
+        netCDF file chunks. To load these variables, it's important to load chunks and store values as class properties
+        for future handling.
+        """
+
         chunk = self.chunk_start
         for i in range(self.chunk_num):
             file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
@@ -100,7 +103,6 @@ class DataPreprocessor:
         self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
 
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
-        # self.last_sync_tot = []
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
             print('\nPreprocessed data file(s) found. No need to create new one(s)...')
         else:
@@ -407,43 +409,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-# Graveyard
-# def load_data(self):
-#     self.generic_fname = Path(self.fname).stem
-#     self.fname_nc = self.generic_fname + '_preprocessed.nc'
-#     self.file_path_pkl = Path(self.data_dir + self.preprocessed_dir) / self.fname_pkl
-#     self.file_path_nc = Path(self.data_dir + self.preprocessed_dir) / self.fname_nc
-#
-#     # Search for preexisting preprocessed datafile. Else, create one.
-#     if self.file_path_nc.exists():
-#         print('\nPreprocessed datafile already exists.')
-#     else:
-#         print('\nPreprocessed datafile not found. Starting process to create it...\n')
-#         # If pickle file does not exist yet, then create it
-#         if self.file_path_pkl.exists() == False:
-#             print('No existing pickle object found.\nCreating pickle object...')
-#             start = time.time()
-#
-#             # Look at first row to check for headers.
-#             headers = ['dev', 'sec', 'usec', 'overflow', 'channel', 'dtime', '[uint32_t version of binary data]']
-#             first_row = pd.read_csv(self.data_dir + self.fname, nrows=1, header=None).iloc[0]
-#
-#             # Check if first row is all strings or digits. If digits, likely missing the headers.
-#             # Can happen when splitting/splicing data files.
-#             if all(isinstance(x, str) for x in first_row) and not all(str(x).isdigit() for x in first_row):
-#                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',')
-#             else:
-#                 df = pd.read_csv(self.data_dir + self.fname, delimiter=',', header=None)
-#                 df.columns = headers
-#             outfile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'wb')
-#             pickle.dump(df, outfile)
-#             outfile.close()
-#             print('Finished pickling.\nTime elapsed: {:.2f} s'.format(time.time() - start))
-#
-#         # Unpickle the data to DataFrame
-#         print('Pickle file found. Loading...')
-#         infile = open('{}/{}/{}'.format(self.data_dir, self.preprocessed_dir, self.fname_pkl), 'rb')
-#         self.df = pickle.load(infile)
-#         infile.close()
-#         print('Finished loading.')
