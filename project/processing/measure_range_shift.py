@@ -47,9 +47,9 @@ def gen_histogram(dp):
 
     dp.load_chunk()
 
+    # Ravel "ranges" and "shots_time" lists into one continuous array
     ranges = np.concatenate([da.values.ravel() for da in dp.ranges_tot])
     shots_time = np.concatenate([da.values.ravel() for da in dp.shots_time_tot])
-
     max_shots_idx = np.argmin(np.abs(shots_time - max_time))
     min_shots_idx = np.argmin(np.abs(shots_time - min_time))
     ranges = ranges[min_shots_idx:max_shots_idx]
@@ -60,7 +60,8 @@ def gen_histogram(dp):
     tbins = np.arange(min_time, max_time, dp.tbinsize)  # [s]
     rbins = np.arange(min_range, max_range, dp.rbinsize)  # [m]
 
-    H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # Generate 2D histogram
+    # Generate 2D histogram
+    H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # [cnts] [s] [m]
     H = H.T  # flip axes
     flux = H / (dp.rbinsize / dp.c * 2) / (
             dp.tbinsize * dp.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$,
@@ -75,6 +76,15 @@ def gen_histogram(dp):
     }
 
 def cross_correlate(sig_1, sig_2):
+    """
+    calculate cross correlation of two signals
+    Inputs:
+    sig_1 (nx1): signal one
+    sig_2 (nx1): signal two
+    Returns:
+    xcorr_sig (nx1): correlation output
+    """
+
     eps = 1e-12  # small value to avoid dividing by zero
     Sig_1 = np.fft.fft(sig_1)
     Sig_2 = np.fft.fft(sig_2)
@@ -86,11 +96,15 @@ def cross_correlate(sig_1, sig_2):
     return xcorr_sig
 
 def loc_max(xcorr_sig_tot, shift_ranges):
+    """
+    Detects range shift based on peak of correlation output
+    Input:
+    xcorr_sig_tot: (nxm) correlated signal output (can be accumulated over m runs)
+    shift_ranges [m]: (nx1) ranges associated with correlation shifts
+    """
     # Locate maximum in cross-correlation result
     max_idx = np.argmax(xcorr_sig_tot, axis=0)
     max_rshift = shift_ranges[max_idx]
-    # mean_rshift = np.mean(max_rshift)
-    # stdev_rshift = np.std(max_rshift, ddof=1)
 
     return max_rshift
 
@@ -100,6 +114,7 @@ def main():
     the entire aquisition period and keep high range resolution. Look at "gen_histogram" function description.
     """
 
+    # Load high- and low-gain '.ARSENL' data. Preprocess and create histograms.
     dp_hg = DataPreprocessor(config)
     dp_lg = DataPreprocessor(config)
     dp_hg.fname = r'/Dev_0_-_2025-09-11_18.06.18.ARSENL'
@@ -109,12 +124,13 @@ def main():
     histogram_results_hg = gen_histogram(dp_hg)
     histogram_results_lg = gen_histogram(dp_lg)
 
+    # Measured photon flux
     g1_orig = histogram_results_hg['flux_raw']
     g2_orig = histogram_results_lg['flux_raw']
 
     # Start cross-correlation operation and bootstrap resample to generate empirical spread in results.
     n_rbins, n_frames = g1_orig.shape
-    nboot = 20000
+    nboot = 2000  # Number of runs in bootstrap
     xcorr_sig_val_tot = np.zeros((n_rbins, nboot))
     xcorr_sig_test_tot = np.zeros((n_rbins, nboot))
     for i in range(nboot):
@@ -134,17 +150,6 @@ def main():
         xcorr_sig_val_tot[:, i] = xcorr_sig_val
         xcorr_sig_test_tot[:, i] = xcorr_sig_test
 
-        # rep_idx = np.random.randint(0, n_frames, size=n_frames)
-        # g1 = g1_orig[:, rep_idx].sum(axis=1)
-        # g2 = g2_orig[:, rep_idx].sum(axis=1)
-        # G1 = np.fft.fft(g1)
-        # G2 = np.fft.fft(g2)
-        # phase_corr = G1 * np.conj(G2) / (np.abs(G1 * np.conj(G2)) + eps)  # 1D phase correlator
-        # xcorr_sig = np.fft.ifft(phase_corr)
-        # xcorr_sig = np.fft.fftshift(xcorr_sig)
-        # xcorr_sig = np.abs(xcorr_sig)  # can take absolute value since imaginary components are negligible
-
-
     # Generate cross-correlation axis
     r_binedges = histogram_results_lg['r_binedges']  # [m]
     dr = r_binedges[1] - r_binedges[0]  # [m]
@@ -157,16 +162,10 @@ def main():
     max_rshift_val = loc_max(xcorr_sig_val_tot, shift_ranges)
     max_rshift_test = loc_max(xcorr_sig_test_tot, shift_ranges)
 
+    # Calculate shift and uncertainty estimate
     residual = max_rshift_val - max_rshift_test
     stdev_rshift = np.sqrt(np.sum(residual**2) / (len(max_rshift_val) - 1))
-    # mean_rshift_val = np.mean(max_rshift_val)
     mean_rshift_test = np.mean(max_rshift_test)
-
-
-    # max_idx_val = np.argmax(xcorr_sig_val_tot, axis=0)
-    # max_rshift_val = shift_ranges[max_idx_val]
-    # mean_rshift_val = np.mean(max_rshift_val)
-    # stdev_rshift_val = np.std(max_rshift_val, ddof=1)
 
     # Plot bootstrapped cross-correlation results.
     gs = gridspec.GridSpec(1, 2, width_ratios=[1, 2])
