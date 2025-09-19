@@ -18,11 +18,6 @@ import matplotlib.gridspec as gridspec
 
 from data_preprocessor import DataPreprocessor
 
-config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
-with open(config_path) as f:
-    config = yaml.safe_load(f)
-
-
 def gen_histogram(dp):
     """
     Description: Generate histogram for these tests. Different from "data_preprocessor.gen_histogram" method because
@@ -111,8 +106,12 @@ def loc_max(xcorr_sig_tot, shift_ranges):
 def main():
     """
     Start by loading data and creating histograms. Make sure histograms integrate the hard-target region in time over
-    the entire aquisition period and keep high range resolution. Look at "gen_histogram" function description.
+    the entire acquisition period and keep high range resolution. Look at "gen_histogram" function description.
     """
+
+    config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
+    with open(config_path) as f:
+        config = yaml.safe_load(f)
 
     # Load high- and low-gain '.ARSENL' data. Preprocess and create histograms.
     dp_hg = DataPreprocessor(config)

@@ -52,6 +52,7 @@ class DataPreprocessor:
         self.range_shift = config['process_params']['range_shift']
 
         # Plot params
+        self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
         self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
@@ -96,9 +97,8 @@ class DataPreprocessor:
             # Load chunks one at a time and calculate measurements from file format
             chunk_iter = 0
             last_sync = -1  # Track the last shot time per chunk
-            chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
             buffer = pd.DataFrame()  # store leftover rows across chunks
-            for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=chunksize,
+            for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=self.chunksize,
                                      dtype=int, on_bad_lines='skip', encoding_errors='ignore'):
 
                 """
@@ -264,7 +264,6 @@ class DataPreprocessor:
         H = H.T  # flip axes
         flux = H / (self.rbinsize / self.c * 2) / (
                 self.tbinsize * self.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$, 
-        # where $\Phi$ is flux, $n$ is photon counts, $N$ is laser shots number, and $\Delta t$ is range resolution.
 
         # Estimate background flux
         bg_edges_idx = [np.argmin(np.abs(rbins - self.bg_edges[0])), np.argmin(np.abs(rbins - self.bg_edges[1]))]
@@ -287,6 +286,12 @@ class DataPreprocessor:
         }
 
     def plot_histogram(self, histogram_results):
+        """
+        Plot histogram using results from "gen_histogram" method
+
+        Inputs:
+            histogram_results: output dictionary from "gen_histogram" function
+        """
         # Processed data
         flux_raw = histogram_results['flux_raw']
         flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
@@ -328,6 +333,10 @@ class DataPreprocessor:
         plt.show()
 
     def plot_scatter(self):
+        """
+        Display scatter plot of time tags
+        """
+
         self.load_chunk()
 
         ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
@@ -405,7 +414,7 @@ class DataPreprocessor:
             # Load small first chunk of high-gain file too
             hg_fname = self.fname.replace("Dev_1", "Dev_0")  # high-gain filename
             chunk_hg = next(pd.read_csv(self.data_dir + self.date + hg_fname, delimiter=',',
-                                        chunksize=chunksize, dtype=int, on_bad_lines='skip',
+                                        chunksize=self.chunksize, dtype=int, on_bad_lines='skip',
                                         encoding_errors='ignore'))
             sync_hg = chunk_hg.loc[(chunk_hg['overflow'] == 1) & (chunk_hg['channel'] == 0)]
             sync_hg_idx = sync_hg.index
@@ -446,6 +455,10 @@ class DataPreprocessor:
 
 
 def main():
+    """
+    Load .ARSENL file --> preprocess to netcdf file --> generate and display histogram or display scatter plot
+    """
+
     config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
     with open(config_path) as f:
         config = yaml.safe_load(f)
