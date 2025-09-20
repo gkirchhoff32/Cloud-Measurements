@@ -1,5 +1,4 @@
 """
-
 data_conditioning.py
 
 This defines methods that are important for preparing .ARSENL data for processing
@@ -10,7 +9,6 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 import pandas as pd
-import yaml
 from pathlib import Path
 import xarray as xr
 import os
@@ -453,24 +451,3 @@ class DataPreprocessor:
             counter += 1
         return filename
 
-
-def main():
-    """
-    Load .ARSENL file --> preprocess to netcdf file --> generate and display histogram or display scatter plot
-    """
-
-    config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
-
-    dp = DataPreprocessor(config)
-    dp.preprocess()
-    if dp.histogram:
-        histogram_results = dp.gen_histogram()
-        dp.plot_histogram(histogram_results)
-    else:
-        dp.plot_scatter()
-
-
-if __name__ == '__main__':
-    main()
