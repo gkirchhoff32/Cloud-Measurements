@@ -28,6 +28,9 @@ class DataPreprocessor:
         self.low_gain = None
         self.ranges_tot = []
         self.shots_time_tot = []
+        self.flux_bg_sub = False
+        self.cbar_max = None
+        self.cbar_min = None
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
@@ -48,6 +51,7 @@ class DataPreprocessor:
         self.time_delay_correct = config['process_params']['time_delay_correct']
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
+        self.mueller = config['process_params']['mueller']
 
         # Plot params
         self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
@@ -97,7 +101,7 @@ class DataPreprocessor:
             last_sync = -1  # Track the last shot time per chunk
             buffer = pd.DataFrame()  # store leftover rows across chunks
             for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=self.chunksize,
-                                     dtype=int, on_bad_lines='skip', encoding_errors='ignore'):
+                                     dtype=int, on_bad_lines='skip', encoding_errors='ignore', skipfooter=1):
 
                 """
                 -------------------------------------------------------
@@ -296,6 +300,7 @@ class DataPreprocessor:
         """
         # Processed data
         flux_raw = histogram_results['flux_raw']
+        flux_bg_sub = histogram_results['flux_bg_sub']
         flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
         bg_flux = histogram_results['bg_flux']  # [Hz] background flux
         t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
@@ -314,6 +319,12 @@ class DataPreprocessor:
             fig.suptitle('CoBaLT Range-Corrected Backscatter Flux')
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Range-Corrected Flux [Hz m^2]')
+        elif self.flux_bg_sub:
+            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
+                                 norm=LogNorm(vmin=self.cbar_min, vmax=self.cbar_max))
+            fig.suptitle('CoBaLT Background-Subtracted Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Flux [Hz]')
         else:
             mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_raw, cmap='viridis',
                                  norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(), vmax=flux_raw.max()))
@@ -367,6 +378,58 @@ class DataPreprocessor:
             fig.savefig(fname, dpi=self.save_dpi)
             print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         plt.show()
+
+    def mueller_correct(self, histogram_results):
+        flux_raw = histogram_results['flux_raw']
+        r_binedges = histogram_results['r_binedges']
+        deadtime = 29.1e-9  # [s]
+
+        flux_mueller = flux_raw / (1 - deadtime * flux_raw)  # [Hz]
+
+        # Estimate background flux
+        show_hg = input("\nShow histogram to estimate background? (Y/N)")
+        while True:
+            if (show_hg == 'Y') or (show_hg == 'y'):
+                self.use_xlim = False
+                self.use_ylim = False
+                self.plot_histogram(histogram_results)
+                break
+            elif (show_hg == 'N') or (show_hg == 'n'):
+                break
+            else:
+                print('Please input "Y" or "N".')
+
+        bg_ranges = input("\nEnter ranges [km] to estimate background (format: min1,max1): ")
+        min_bg, max_bg = map(float, bg_ranges.split(","))  # [km]
+        self.bg_edges = [min_bg, max_bg]
+        bg_edges_idx = [np.argmin(np.abs(r_binedges - self.bg_edges[0] * 1e3)), np.argmin(np.abs(r_binedges - self.bg_edges[1] * 1e3))]
+
+        flux_bg = np.mean(flux_raw[bg_edges_idx[0]:bg_edges_idx[1], :])
+        flux_bg_sub = flux_raw - flux_bg  # [Hz] flux with background subtracted
+        flux_m_bg = np.mean(flux_mueller[bg_edges_idx[0]:bg_edges_idx[1], :])
+        flux_m_bg_sub = flux_mueller - flux_m_bg  # [Hz] flux with mueller correction and background subtracted
+
+        # TODO: create a way to set y lim and keep it compatibel during background estimation
+
+        print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
+        if flux_bg >= 25e3:  # [Hz]
+            print('Background estimate too high. Recommend to check background range values...')
+            user_quit = input('Quit? (Y/N)')
+            if (user_quit == 'Y') or (user_quit == 'y'):
+                quit()
+
+        # Only background subtract
+        histogram_results['flux_bg_sub'] = flux_bg_sub  # [Hz]
+        histogram_results['flux_bg'] = flux_bg  # [Hz]
+        self.cbar_max = flux_bg_sub.max()  # [Hz]
+        self.cbar_min = flux_bg  # [Hz]
+        self.flux_bg_sub = True
+        self.plot_histogram(histogram_results)
+
+        # Mueller corrected and background subtracted
+        histogram_results['flux_bg_sub'] = flux_m_bg_sub  # [Hz]
+        histogram_results['flux_bg'] = flux_m_bg  # [Hz]
+        self.plot_histogram(histogram_results)
 
     def load_chunk(self):
         """

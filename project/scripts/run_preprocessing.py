@@ -23,11 +23,15 @@ def main():
 
     dp = DataPreprocessor(config)
     dp.preprocess()
-    if dp.histogram:
+    if dp.mueller:
         histogram_results = dp.gen_histogram()
-        dp.plot_histogram(histogram_results)
+        dp.mueller_correct(histogram_results)
     else:
-        dp.plot_scatter()
+        if dp.histogram:
+            histogram_results = dp.gen_histogram()
+            dp.plot_histogram(histogram_results)
+        else:
+            dp.plot_scatter()
 
 if __name__ == '__main__':
     main()

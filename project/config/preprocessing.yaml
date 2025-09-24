@@ -14,25 +14,25 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-09-13_22.16.13.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-09-13_21.47.46.ARSENL'  # main data file name
 
 process_params:
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
+  mueller: True  # Set TRUE if user desires to apply standar Mueller correction to histogram
 
 plot_params:
-  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
-  use_xlim: True  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
+  use_xlim: False  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
   save_img: True  # Set TRUE to save figure out to image directory.
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
-  # exclude: [0, 70.0e-6]          # [s] temporal window bounds
   tbinsize: 1                    # [s] temporal bin size
-  rbinsize: 0.1                  # [m] range bin size
+  rbinsize: 1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
-  ylim: [3, 3.1]  # [km]
+  ylim: [5, 8]  # [km]
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
   xlim: [75, 125]  # [s] 
@@ -42,4 +42,4 @@ plot_params:
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.0001    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
