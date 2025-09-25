@@ -13,6 +13,8 @@ from pathlib import Path
 import xarray as xr
 import os
 import glob
+import re
+from datetime import datetime
 
 
 class DataPreprocessor:
@@ -31,6 +33,7 @@ class DataPreprocessor:
         self.flux_bg_sub = False
         self.cbar_max = None
         self.cbar_min = None
+        self.timestamp = None
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
@@ -43,25 +46,30 @@ class DataPreprocessor:
         self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
         self.unwrap_modulo = config['system_params']['unwrap_modulo']  # clock rollover count
         self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
+        self.deadtime_hg = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
+        self.deadtime_lg = config['system_params']['deadtime_lg']  # [s] low-gain detector deadtime
 
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
 
         # Process params
+        self.load_ylim = config['process_params']['load_ylim']  # TRUE value limits range when generating histogram
+        self.load_xlim = config['process_params']['load_xlim']  # TRUE value limits range when generating histogram
         self.time_delay_correct = config['process_params']['time_delay_correct']
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
-        self.mueller = config['process_params']['mueller']
+        self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
+        self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
 
         # Plot params
         self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
+        self.plot_xlim = config['plot_params']['plot_xlim']  # TRUE value limits range only when plotting
+        self.plot_ylim = config['plot_params']['plot_ylim']  # TRUE value limits range only when plotting
         self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
         self.dpi = config['plot_params']['dpi']  # dots-per-inch
         self.figsize = config['plot_params']['figsize']  # figure size in inches
-        self.use_ylim = config['plot_params']['use_ylim']  # TRUE value activates 'axes.set_ylim' argument
-        self.use_xlim = config['plot_params']['use_xlim']  # TRUE value activates 'axes.set_xlim' argument
         self.ylim = config['plot_params']['ylim']  # [km] y-axis limits
         self.xlim = config['plot_params']['xlim']  # [s] x-axis limits
         self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE, else scatter plot
@@ -73,6 +81,7 @@ class DataPreprocessor:
         self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
         self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
         # then it will plot the available ones
+
 
     def preprocess(self):
         """
@@ -86,7 +95,7 @@ class DataPreprocessor:
         self.fname_nc = self.generic_fname + '.nc'
         self.preprocess_path = self.data_dir + self.preprocessed_dir + self.date
         self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
-        self.low_gain = True if 'Dev_1' in self.fname else False
+        self.parse_filename()
 
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
@@ -101,7 +110,7 @@ class DataPreprocessor:
             last_sync = -1  # Track the last shot time per chunk
             buffer = pd.DataFrame()  # store leftover rows across chunks
             for chunk in pd.read_csv(self.data_dir + self.date + self.fname, delimiter=',', chunksize=self.chunksize,
-                                     dtype=int, on_bad_lines='skip', encoding_errors='ignore', skipfooter=1):
+                                     dtype=int, on_bad_lines='skip', encoding_errors='ignore'):
 
                 """
                 -------------------------------------------------------
@@ -134,8 +143,17 @@ class DataPreprocessor:
                     buffer = chunk.iloc[cut_idx:]
 
                 # If this is the first chunk, then remove calibration section from data
-                if (chunk_iter == 0) and (self.time_delay_correct is True):
-                    chunk_trim, shot_diff = self.calibrate_time(sync, chunk_trim)
+                if (chunk_iter == 0) and (self.low_gain is True):
+                    if self.time_delay_correct is True:
+                        chunk_trim, shot_diff = self.calibrate_time(sync, chunk_trim)
+                        input("Calculating time shift between channels. User needs to ensure calibration was conducted "
+                              "for this measurement. Press any key to continue...")
+                    else:
+                        shot_diff = 0
+                        input("Will not calculate time shift between channels. User needs to ensure this is intended. "
+                              "Press any key to continue...")
+                else:
+                    shot_diff = None
 
                 # Clock rollover ("overflow", "channel" = 1,63). Max count is 2^25-1=33554431
                 rollover = chunk_trim.loc[(chunk_trim['overflow'] == 1) & (chunk_trim['channel'] == 63)]
@@ -179,7 +197,7 @@ class DataPreprocessor:
                 last_sync = shots_ref[-1]  # Track last sync event
                 shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot TODO: fix PRF estimation and use sync timestamps
 
-                # Convert detection times relative to most recent laser shot                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           timestamps to relative timestamps
+                # Convert detection times relative to most recent laser shot timestamps to relative timestamps
                 detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
 
                 # Handle rollover events. Add the clock rollover value to any negative timestamps.
@@ -190,11 +208,11 @@ class DataPreprocessor:
                 detect_times_rel[rollover_idx] += self.unwrap_modulo
 
                 # Convert to flight times and range
-                flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25 ps increments
+                flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25-ps increments
                 ranges = flight_times * self.c / 2  # [m]
 
                 # Range correct for path-length difference
-                if (self.range_shift_correct == True) and ("Dev_0" in self.fname):
+                if (self.range_shift_correct is True) and (self.low_gain is False):
                     ranges += self.range_shift  # [m]
 
                 """ 
@@ -240,10 +258,10 @@ class DataPreprocessor:
             flux_raw [Hz]: (nxm) uncorrected flux
         """
 
-        if self.use_xlim:
+        if self.load_xlim:
             min_time = self.xlim[0]  # [s]
             max_time = self.xlim[1]  # [s]
-        if self.use_ylim:
+        if self.load_ylim:
             min_range = self.ylim[0] * 1e3  # [m]
             max_range = self.ylim[1] * 1e3  # [m]
 
@@ -252,7 +270,10 @@ class DataPreprocessor:
         ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
-        if self.use_xlim:
+        if self.estimate_deadtime:
+            self.measure_deadtime(ranges)
+
+        if self.load_xlim:
             max_shots_idx = np.argmin(np.abs(shots_time - max_time))
             min_shots_idx = np.argmin(np.abs(shots_time - min_time))
             shots_time = shots_time[min_shots_idx:max_shots_idx]
@@ -261,7 +282,7 @@ class DataPreprocessor:
         print('\nStarting to generate histogram...')
         start = time.time()
         tbins = np.arange(shots_time[0], shots_time[-1], self.tbinsize)  # [s]
-        if self.use_ylim:
+        if self.load_ylim:
             rbins = np.arange(min_range, max_range, self.rbinsize)  # [m]
         else:
             rbins = np.arange(0, self.c / 2 / self.PRF, self.rbinsize)  # [m]
@@ -333,9 +354,9 @@ class DataPreprocessor:
             cbar.set_label('Flux [Hz]')
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
-        ax.set_title('Scale {:.1f} m x {:.2f} s'.format(self.rbinsize, self.tbinsize))
-        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
-        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.use_xlim else None
+        ax.set_title('Scale {:.1f} m x {:.2f} s\n{} {}'.format(self.rbinsize, self.tbinsize, "Low Gain" if self.low_gain else "High Gain", self.timestamp))
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
@@ -362,11 +383,11 @@ class DataPreprocessor:
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
         ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, linewidths=0)
-        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.use_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
-        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.use_xlim else None
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
-        ax.set_title('CoBaLT Backscatter')
+        ax.set_title('CoBaLT Backscatter\n{} {}'.format("Low Gain" if self.low_gain else "High Gain", self.timestamp))
         plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
@@ -382,7 +403,7 @@ class DataPreprocessor:
     def mueller_correct(self, histogram_results):
         flux_raw = histogram_results['flux_raw']
         r_binedges = histogram_results['r_binedges']
-        deadtime = 29.1e-9  # [s]
+        deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
 
         flux_mueller = flux_raw / (1 - deadtime * flux_raw)  # [Hz]
 
@@ -390,9 +411,10 @@ class DataPreprocessor:
         show_hg = input("\nShow histogram to estimate background? (Y/N)")
         while True:
             if (show_hg == 'Y') or (show_hg == 'y'):
-                self.use_xlim = False
-                self.use_ylim = False
+                plot_xlim, plot_ylim = self.plot_xlim, self.plot_ylim
+                self.plot_xlim, self.plot_ylim = False, False
                 self.plot_histogram(histogram_results)
+                self.plot_xlim, self.plot_ylim = plot_xlim, plot_ylim
                 break
             elif (show_hg == 'N') or (show_hg == 'n'):
                 break
@@ -409,7 +431,7 @@ class DataPreprocessor:
         flux_m_bg = np.mean(flux_mueller[bg_edges_idx[0]:bg_edges_idx[1], :])
         flux_m_bg_sub = flux_mueller - flux_m_bg  # [Hz] flux with mueller correction and background subtracted
 
-        # TODO: create a way to set y lim and keep it compatibel during background estimation
+        # TODO: create a way to set y lim and keep it compatible during background estimation
 
         print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
         if flux_bg >= 25e3:  # [Hz]
@@ -517,4 +539,45 @@ class DataPreprocessor:
             filename = f"{base}_{counter}{ext}"
             counter += 1
         return filename
+
+    def parse_filename(self):
+        match = re.match(r"Dev_(\d)_-_(\d{4}-\d{2}-\d{2})_(\d{2}\.\d{2}\.\d{2}).nc", self.fname_nc)
+        if not match:
+            raise ValueError(f"Filename format not recognized: {self.fname_nc}")
+
+        dev, date_str, time_str = match.groups()
+        self.low_gain = True if dev == "1" else False
+
+        # Convert to datetime if useful
+        self.timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
+        print("Measurement time: {}".format(self.timestamp))
+
+    def measure_deadtime(self, ranges):
+        flight_times = ranges / self.c * 2  # [s]
+        intr_times = np.diff(flight_times)  # [s] Inter-arrival times
+        max_val = 100e-9  # [s] capping range to explore deadtime value from inter-arrival times
+        bins = np.arange(0, max_val, self.clock_res)  # [s]
+        start = time.time()
+        cnts, bin_edges = np.histogram(intr_times, bins)  # [], [s]
+        print('Time elapsed {} s'.format(time.time() - start))
+        binsize = bin_edges[1] - bin_edges[0]  # [s]
+        bin_centers = bin_edges[:-1] + 0.5 * binsize  # [s]
+        bin_widths = np.diff(bin_edges)  # [s]
+        deadtime_estimate = bin_centers[np.argmax(cnts)]  # [s]
+        print('Deadtime Estimate: {:.4f} ns'.format(deadtime_estimate * 1e9))
+        setattr(self, f"deadtime_{'lg' if self.low_gain else 'hg'}", deadtime_estimate)
+
+        xmax = deadtime_estimate * 1e9  # [ns]
+        ymax = cnts.max()
+        fig = plt.figure(dpi=400, figsize=(4, 3))
+        ax = fig.add_subplot(111)
+        ax.bar(bin_centers * 1e9, cnts, width=bin_widths*1e9, align="edge", edgecolor="black")
+        ax.annotate("Deadtime Estimate {:.1f} ns".format(deadtime_estimate*1e9), xy=(xmax, ymax),
+                    xytext=(xmax, 1.3 * ymax), ha="center", va="bottom", arrowprops=dict(arrowstyle="->"))
+        ax.set_xlabel("$\Delta t$ [ns]")
+        ax.set_ylabel("Counts")
+        ax.set_title('Inter-Arrival Times {} Channel\n{}'.format("Low-Gain" if self.low_gain is True else "High-Gain", self.timestamp))
+        ax.set_ylim(0, 1.5 * ymax)
+        plt.tight_layout()
+        plt.show()
 
