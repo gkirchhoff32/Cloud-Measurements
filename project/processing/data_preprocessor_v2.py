@@ -17,29 +17,30 @@ import re
 from datetime import datetime
 
 
-class DataPreprocessor:
+class DataProcessor:
     def __init__(self, config):
-        self.df = None
-        self.df1 = None
-        self.fname_nc = None
-        self.file_path_nc = None
-        self.generic_fname = None
-        self.img_save_path = None
-        self.preprocess_path = None
-        self.low_gain = None
-        self.ranges_tot = []
-        self.shots_time_tot = []
-        self.flux_bg_sub = False
-        self.cbar_max = None
-        self.cbar_min = None
-        self.timestamp = None
+        self.loader = DataLoader(config)
+        self.plotter = DataPlotter(config)
+        self.deadtime = DeadtimeCorrect(config)
 
-        # File params
-        self.fname = config['file_params']['fname']  # File name of raw data
-        self.data_dir = config['file_params']['data_dir']  # Directory of raw data
-        self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
-        self.image_dir = config['file_params']['image_dir']  # Directory to save images
-        self.date = config['file_params']['date']  # YYYYMMDD: points to identically named directories
+    def run(self):
+
+        self.loader.preprocess()
+        if self.deadtime.mueller:
+            histogram_results = self.loader.gen_histogram(self.deadtime)
+            self.deadtime.mueller_correct(histogram_results, self.loader, self.plotter)
+        else:
+            if self.plotter.histogram:
+                histogram_results = self.loader.gen_histogram(self.deadtime)
+                self.plotter.plot_histogram(histogram_results, self.loader)
+            else:
+                self.plotter.plot_scatter(self.loader)
+
+
+class DeadtimeCorrect:
+    def __init__(self, config):
+        # Constants
+        self.c = config['constants']['c']  # [m/s] speed of light
 
         # System Params
         self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
@@ -48,17 +49,113 @@ class DataPreprocessor:
         self.deadtime_hg = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
         self.deadtime_lg = config['system_params']['deadtime_lg']  # [s] low-gain detector deadtime
 
+        self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
+
+
+    def mueller_correct(self, histogram_results, loader, plotter):
+        flux_raw = histogram_results['flux_raw']
+        r_binedges = histogram_results['r_binedges']
+        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
+
+        # Calculate flux estimate based on Mueller Correction
+        flux_mueller = flux_raw / (1 - deadtime * flux_raw)  # [Hz]
+
+        # Estimate background flux
+        show_hg = input("\nShow histogram to estimate background? (Y/N)")
+        while True:
+            if (show_hg == 'Y') or (show_hg == 'y'):
+                plot_xlim, plot_ylim = plotter.plot_xlim, plotter.plot_ylim
+                plotter.plot_xlim, plotter.plot_ylim = False, False
+                plotter.plot_histogram(histogram_results)
+                plotter.plot_xlim, plotter.plot_ylim = plot_xlim, plot_ylim
+                break
+            elif (show_hg == 'N') or (show_hg == 'n'):
+                break
+            else:
+                print('Please input "Y" or "N".')
+
+        bg_ranges = input("\nEnter ranges [km] to estimate background (format: min1,max1): ")
+        min_bg, max_bg = map(float, bg_ranges.split(","))  # [km]
+        plotter.bg_edges = [min_bg, max_bg]
+        bg_edges_idx = [np.argmin(np.abs(r_binedges - plotter.bg_edges[0] * 1e3)), np.argmin(np.abs(r_binedges - plotter.bg_edges[1] * 1e3))]
+
+        # Subtract background for both deadtime corrected and uncorrected cases
+        flux_bg = np.mean(flux_raw[bg_edges_idx[0]:bg_edges_idx[1], :])
+        flux_bg_sub = flux_raw - flux_bg  # [Hz] flux with background subtracted
+        flux_m_bg = np.mean(flux_mueller[bg_edges_idx[0]:bg_edges_idx[1], :])
+        flux_m_bg_sub = flux_mueller - flux_m_bg  # [Hz] flux with mueller correction and background subtracted
+
+        print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
+        if flux_bg >= 25e3:  # [Hz]
+            print('Background estimate too high. Recommend to check background range values...')
+            user_quit = input('Quit? (Y/N)')
+            if (user_quit == 'Y') or (user_quit == 'y'):
+                quit()
+
+        histogram_results['flux_bg_sub'] = flux_bg_sub  # [Hz]
+        histogram_results['flux_bg'] = flux_bg  # [Hz]
+        plotter.cbar_max = flux_bg_sub.max()  # [Hz]
+        plotter.cbar_min = flux_bg  # [Hz]
+        plotter.flux_bg_sub = True
+        plotter.plot_histogram(histogram_results)
+
+        # Mueller corrected and background subtracted
+        histogram_results['flux_bg_sub'] = flux_m_bg_sub  # [Hz]
+        histogram_results['flux_bg'] = flux_m_bg  # [Hz]
+        plotter.plot_histogram(histogram_results)
+
+    def measure_deadtime(self, ranges, loader):
+        """
+        Empirically measure and plot the deadtime from time tags from saturating measurement.
+
+        Inputs:
+            ranges (nx1): [m] range array
+        """
+
+        # Calculate inter-arrival flight times
+        flight_times = ranges / self.c * 2  # [s]
+        intr_times = np.diff(flight_times)  # [s] Inter-arrival times
+
+        start = time.time()
+        max_val = 100e-9  # [s] capping range to explore deadtime value from inter-arrival times. Usually around 20-40
+        # ns for SPCM detectors.
+        bins = np.arange(0, max_val, self.clock_res)  # [s]
+        cnts, bin_edges = np.histogram(intr_times, bins)  # [], [s]
+        print('Time elapsed {} s'.format(time.time() - start))
+
+        # Deadtime estimate is the inter-arrival histogram peak location
+        binsize = bin_edges[1] - bin_edges[0]  # [s]
+        bin_centers = bin_edges[:-1] + 0.5 * binsize  # [s]
+        bin_widths = np.diff(bin_edges)  # [s]
+        deadtime_estimate = bin_centers[np.argmax(cnts)]  # [s]
+        print('Deadtime Estimate: {:.4f} ns'.format(deadtime_estimate * 1e9))
+        setattr(self, f"deadtime_{'lg' if loader.low_gain else 'hg'}", deadtime_estimate)
+
+        # Plot inter-arrival time histogram
+        xmax = deadtime_estimate * 1e9  # [ns]
+        ymax = cnts.max()
+        fig = plt.figure(dpi=400, figsize=(4, 3))
+        ax = fig.add_subplot(111)
+        ax.bar(bin_centers * 1e9, cnts, width=bin_widths*1e9, align="edge", edgecolor="black")
+        ax.annotate("Deadtime Estimate {:.1f} ns".format(deadtime_estimate*1e9), xy=(xmax, ymax),
+                    xytext=(xmax, 1.3 * ymax), ha="center", va="bottom", arrowprops=dict(arrowstyle="->"))
+        ax.set_xlabel("$\Delta t$ [ns]")
+        ax.set_ylabel("Counts")
+        ax.set_title('Inter-Arrival Times {} Channel\n{}'.format("Low-Gain" if loader.low_gain is True else "High-Gain", loader.timestamp))
+        ax.set_ylim(0, 1.5 * ymax)
+        plt.tight_layout()
+        plt.show()
+
+
+class DataPlotter:
+    def __init__(self, config):
+        self.flux_bg_sub = False
+
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
 
-        # Process params
-        self.load_ylim = config['process_params']['load_ylim']  # TRUE value limits range when generating histogram
-        self.load_xlim = config['process_params']['load_xlim']  # TRUE value limits range when generating histogram
-        self.time_delay_correct = config['process_params']['time_delay_correct']
-        self.range_shift_correct = config['process_params']['range_shift_correct']
-        self.range_shift = config['process_params']['range_shift']
-        self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
-        self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
+        # System Params
+        self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
 
         # Plot params
         self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
@@ -81,6 +178,139 @@ class DataPreprocessor:
         self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
         # then it will plot the available ones
 
+    def plot_histogram(self, histogram_results, loader):
+        """
+        Plot histogram using results from "gen_histogram" method
+
+        Inputs:
+            histogram_results: output dictionary from "gen_histogram" function
+        """
+        # Processed data
+        flux_raw = histogram_results['flux_raw']
+        flux_bg_sub = histogram_results['flux_bg_sub']
+        flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
+        bg_flux = histogram_results['bg_flux']  # [Hz] background flux
+        t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
+        r_binedges = histogram_results['r_binedges']  # [m] range bin edges
+
+        # Start plotting
+        print('\nStarting to generate histogram plot...')
+        start = time.time()
+
+        fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
+        ax = fig.add_subplot(111)
+        if self.flux_correct:
+            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
+                                 norm=LogNorm(vmin=bg_flux * ((self.bg_edges[0] + self.bg_edges[1]) / 2) ** 2,
+                                              vmax=flux_corrected.max()))
+            fig.suptitle('CoBaLT Range-Corrected Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Range-Corrected Flux [Hz m^2]')
+        elif self.flux_bg_sub:
+            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
+                                 norm=LogNorm(vmin=self.cbar_min, vmax=self.cbar_max))
+            fig.suptitle('CoBaLT Background-Subtracted Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Flux [Hz]')
+        else:
+            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_raw, cmap='viridis',
+                                 norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(), vmax=flux_raw.max()))
+            fig.suptitle('CoBaLT Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Flux [Hz]')
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Range [km]')
+        ax.set_title('Scale {:.1f} m x {:.2f} s\n{} {}'.format(self.rbinsize, self.tbinsize,
+                                                               "Low Gain" if loader.low_gain else "High Gain",
+                                                               loader.timestamp))
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
+            [0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
+        plt.tight_layout()
+        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
+        if self.save_img:
+            img_fname = loader.generic_fname + '_hg' + '.png'
+            loader.img_save_path = Path(loader.data_dir + loader.image_dir + loader.date) / img_fname
+            fname = loader.get_unique_filename(loader.img_save_path)
+            fig.savefig(fname, dpi=self.save_dpi)
+        plt.show()
+
+    def plot_scatter(self, loader):
+        """
+        Display scatter plot of time tags
+        """
+
+        loader.load_chunk()
+
+        ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])
+        shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])
+
+        # Start plotting
+        print('\nStarting to generate scatter plot...')
+        start = time.time()
+
+        fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
+        ax = fig.add_subplot(111)
+        ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, linewidths=0)
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
+            [0, self.c / 2 / self.PRF / 1e3])
+        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Range [km]')
+        ax.set_title(
+            'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))
+        plt.tight_layout()
+        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
+        if self.save_img:
+            print('Starting to save image...')
+            start = time.time()
+            img_fname = loader.generic_fname + '_scatter' + '.png'
+            loader.img_save_path = Path(loader.data_dir + loader.image_dir + loader.date) / img_fname
+            fname = loader.get_unique_filename(loader.img_save_path)
+            fig.savefig(fname, dpi=self.save_dpi)
+            print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
+        plt.show()
+
+
+class DataLoader:
+    def __init__(self, config):
+        self.generic_fname = None
+        self.fname_nc = None
+        self.preprocess_path = None
+        self.ranges_tot = []
+        self.shots_time_tot = []
+        self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
+
+        # System Params
+        self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
+        self.unwrap_modulo = config['system_params']['unwrap_modulo']  # clock rollover count
+        # self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
+        # self.deadtime_hg = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
+        # self.deadtime_lg = config['system_params']['deadtime_lg']  # [s] low-gain detector deadtime
+
+        # Process params
+        self.load_ylim = config['process_params']['load_ylim']  # TRUE value limits range when generating histogram
+        self.load_xlim = config['process_params']['load_xlim']  # TRUE value limits range when generating histogram
+        self.time_delay_correct = config['process_params']['time_delay_correct']
+        self.range_shift_correct = config['process_params']['range_shift_correct']
+        self.range_shift = config['process_params']['range_shift']
+        self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
+
+        # File params
+        self.fname = config['file_params']['fname']  # File name of raw data
+        self.data_dir = config['file_params']['data_dir']  # Directory of raw data
+        self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
+        self.image_dir = config['file_params']['image_dir']  # Directory to save images
+        self.date = config['file_params']['date']  # YYYYMMDD: points to identically named directories
+
+        # Plot params
+        self.ylim = config['plot_params']['ylim']  # [km] y-axis limits
+        self.xlim = config['plot_params']['xlim']  # [s] x-axis limits
+        self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
+        self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
+        self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
+        self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
+        # then it will plot the available ones
 
     def preprocess(self):
         """
@@ -241,7 +471,7 @@ class DataPreprocessor:
             print('Finished preprocessing. File created.\n'
                   'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
 
-    def gen_histogram(self):
+    def gen_histogram(self, deadtime):
         """
         Calculate histogram from range and shots properties of netCDF file. Flux is calculated counts per range bin per
         integrated shots.
@@ -268,7 +498,7 @@ class DataPreprocessor:
         shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
         if self.estimate_deadtime:
-            self.measure_deadtime(ranges)
+            deadtime.measure_deadtime(ranges)
 
         if self.load_xlim:
             max_shots_idx = np.argmin(np.abs(shots_time - max_time))
@@ -287,7 +517,7 @@ class DataPreprocessor:
         H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # Generate 2D histogram
         H = H.T  # flip axes
         flux = H / (self.rbinsize / self.c * 2) / (
-                self.tbinsize * self.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$, 
+                self.tbinsize * self.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$,
 
         # Estimate background flux
         bg_edges_idx = [np.argmin(np.abs(rbins - self.bg_edges[0])), np.argmin(np.abs(rbins - self.bg_edges[1]))]
@@ -308,174 +538,6 @@ class DataPreprocessor:
             'flux_corrected': flux_corrected,
             'flux_raw': flux
         }
-
-    def plot_histogram(self, histogram_results):
-        """
-        Plot histogram using results from "gen_histogram" method
-
-        Inputs:
-            histogram_results: output dictionary from "gen_histogram" function
-        """
-        # Processed data
-        flux_raw = histogram_results['flux_raw']
-        flux_bg_sub = histogram_results['flux_bg_sub']
-        flux_corrected = histogram_results['flux_corrected']  # [Hz m^2] range-corrected background-subtracted flux
-        bg_flux = histogram_results['bg_flux']  # [Hz] background flux
-        t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
-        r_binedges = histogram_results['r_binedges']  # [m] range bin edges
-
-        # Start plotting
-        print('\nStarting to generate histogram plot...')
-        start = time.time()
-
-        fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
-        ax = fig.add_subplot(111)
-        if self.flux_correct:
-            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_corrected, cmap='viridis',
-                                 norm=LogNorm(vmin=bg_flux * ((self.bg_edges[0] + self.bg_edges[1]) / 2) ** 2,
-                                              vmax=flux_corrected.max()))
-            fig.suptitle('CoBaLT Range-Corrected Backscatter Flux')
-            cbar = fig.colorbar(mesh, ax=ax)
-            cbar.set_label('Range-Corrected Flux [Hz m^2]')
-        elif self.flux_bg_sub:
-            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_bg_sub, cmap='viridis',
-                                 norm=LogNorm(vmin=self.cbar_min, vmax=self.cbar_max))
-            fig.suptitle('CoBaLT Background-Subtracted Backscatter Flux')
-            cbar = fig.colorbar(mesh, ax=ax)
-            cbar.set_label('Flux [Hz]')
-        else:
-            mesh = ax.pcolormesh(t_binedges, r_binedges / 1e3, flux_raw, cmap='viridis',
-                                 norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(), vmax=flux_raw.max()))
-            fig.suptitle('CoBaLT Backscatter Flux')
-            cbar = fig.colorbar(mesh, ax=ax)
-            cbar.set_label('Flux [Hz]')
-        ax.set_xlabel('Time [s]')
-        ax.set_ylabel('Range [km]')
-        ax.set_title('Scale {:.1f} m x {:.2f} s\n{} {}'.format(self.rbinsize, self.tbinsize, "Low Gain" if self.low_gain else "High Gain", self.timestamp))
-        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
-        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
-        plt.tight_layout()
-        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
-        if self.save_img:
-            img_fname = self.generic_fname + '_hg' + '.png'
-            self.img_save_path = Path(self.data_dir + self.image_dir + self.date) / img_fname
-            fname = self.get_unique_filename(self.img_save_path)
-            fig.savefig(fname, dpi=self.save_dpi)
-        plt.show()
-
-    def plot_scatter(self):
-        """
-        Display scatter plot of time tags
-        """
-
-        self.load_chunk()
-
-        ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
-        shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
-
-        # Start plotting
-        print('\nStarting to generate scatter plot...')
-        start = time.time()
-
-        fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
-        ax = fig.add_subplot(111)
-        ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, linewidths=0)
-        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
-        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
-        ax.set_xlabel('Time [s]')
-        ax.set_ylabel('Range [km]')
-        ax.set_title('CoBaLT Backscatter\n{} {}'.format("Low Gain" if self.low_gain else "High Gain", self.timestamp))
-        plt.tight_layout()
-        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
-        if self.save_img:
-            print('Starting to save image...')
-            start = time.time()
-            img_fname = self.generic_fname + '_scatter' + '.png'
-            self.img_save_path = Path(self.data_dir + self.image_dir + self.date) / img_fname
-            fname = self.get_unique_filename(self.img_save_path)
-            fig.savefig(fname, dpi=self.save_dpi)
-            print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
-        plt.show()
-
-    def mueller_correct(self, histogram_results):
-        flux_raw = histogram_results['flux_raw']
-        r_binedges = histogram_results['r_binedges']
-        deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
-
-        # Calculate flux estimate based on Mueller Correction
-        flux_mueller = flux_raw / (1 - deadtime * flux_raw)  # [Hz]
-
-        # Estimate background flux
-        show_hg = input("\nShow histogram to estimate background? (Y/N)")
-        while True:
-            if (show_hg == 'Y') or (show_hg == 'y'):
-                plot_xlim, plot_ylim = self.plot_xlim, self.plot_ylim
-                self.plot_xlim, self.plot_ylim = False, False
-                self.plot_histogram(histogram_results)
-                self.plot_xlim, self.plot_ylim = plot_xlim, plot_ylim
-                break
-            elif (show_hg == 'N') or (show_hg == 'n'):
-                break
-            else:
-                print('Please input "Y" or "N".')
-
-        bg_ranges = input("\nEnter ranges [km] to estimate background (format: min1,max1): ")
-        min_bg, max_bg = map(float, bg_ranges.split(","))  # [km]
-        self.bg_edges = [min_bg, max_bg]
-        bg_edges_idx = [np.argmin(np.abs(r_binedges - self.bg_edges[0] * 1e3)), np.argmin(np.abs(r_binedges - self.bg_edges[1] * 1e3))]
-
-        # Subtract background for both deadtime corrected and uncorrected cases
-        flux_bg = np.mean(flux_raw[bg_edges_idx[0]:bg_edges_idx[1], :])
-        flux_bg_sub = flux_raw - flux_bg  # [Hz] flux with background subtracted
-        flux_m_bg = np.mean(flux_mueller[bg_edges_idx[0]:bg_edges_idx[1], :])
-        flux_m_bg_sub = flux_mueller - flux_m_bg  # [Hz] flux with mueller correction and background subtracted
-
-        print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
-        if flux_bg >= 25e3:  # [Hz]
-            print('Background estimate too high. Recommend to check background range values...')
-            user_quit = input('Quit? (Y/N)')
-            if (user_quit == 'Y') or (user_quit == 'y'):
-                quit()
-
-        histogram_results['flux_bg_sub'] = flux_bg_sub  # [Hz]
-        histogram_results['flux_bg'] = flux_bg  # [Hz]
-        self.cbar_max = flux_bg_sub.max()  # [Hz]
-        self.cbar_min = flux_bg  # [Hz]
-        self.flux_bg_sub = True
-        self.plot_histogram(histogram_results)
-
-        # Mueller corrected and background subtracted
-        histogram_results['flux_bg_sub'] = flux_m_bg_sub  # [Hz]
-        histogram_results['flux_bg'] = flux_m_bg  # [Hz]
-        self.plot_histogram(histogram_results)
-
-    def load_chunk(self):
-        """
-        When .ARSENL datasets are too large, the preprocessor method will save the necessary DataArray variables to
-        netCDF file chunks. To load these variables, it's important to load chunks and store values as class properties
-        for future handling.
-        """
-
-        chunk = self.chunk_start
-        for i in range(self.chunk_num):
-            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
-            # If file exists, load it.
-            if glob.glob(file_path):
-                print(f'\nPreprocessed file found: chunk #{chunk}')
-                ds = xr.open_dataset(file_path)
-                self.ranges_tot.append(ds['ranges'])
-                self.shots_time_tot.append(ds['shots_time'])
-                print('\nFile loaded.')
-                chunk += 1
-            # If file does not exist, either config settings for loading are wrong or ran out of chunks to load.
-            else:
-                print(f'\nPreprocessed file not found... check this')
-                if chunk == self.chunk_start:
-                    print('Starting chunk unavailable! Pick a different one.')
-                    quit()
-                else:
-                    print('\nNo more chunks. Starting to plot...')
-                    break
 
     def calibrate_time(self, sync, chunk_trim):
         """
@@ -524,23 +586,33 @@ class DataPreprocessor:
 
         return chunk_trim, shot_diff
 
-    def get_unique_filename(self, filename):
+    def load_chunk(self):
         """
-        When saving data, if filename exists, then save to file name based on iterator
-
-        Params:
-            filename (str): Original save file name
-        Returns:
-            filename (str): New save file name
+        When .ARSENL datasets are too large, the preprocessor method will save the necessary DataArray variables to
+        netCDF file chunks. To load these variables, it's important to load chunks and store values as class properties
+        for future handling.
         """
 
-        base, ext = os.path.splitext(filename)
-        counter = 0
-        filename = f"{base}_{counter}{ext}"
-        while os.path.exists(filename):
-            filename = f"{base}_{counter}{ext}"
-            counter += 1
-        return filename
+        chunk = self.chunk_start
+        for i in range(self.chunk_num):
+            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+            # If file exists, load it.
+            if glob.glob(file_path):
+                print(f'\nPreprocessed file found: chunk #{chunk}')
+                ds = xr.open_dataset(file_path)
+                self.ranges_tot.append(ds['ranges'])
+                self.shots_time_tot.append(ds['shots_time'])
+                print('\nFile loaded.')
+                chunk += 1
+            # If file does not exist, either config settings for loading are wrong or ran out of chunks to load.
+            else:
+                print(f'\nPreprocessed file not found... check this')
+                if chunk == self.chunk_start:
+                    print('Starting chunk unavailable! Pick a different one.')
+                    quit()
+                else:
+                    print('\nNo more chunks. Starting to plot...')
+                    break
 
     def parse_filename(self):
         """
@@ -560,45 +632,36 @@ class DataPreprocessor:
         self.timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
         print("Measurement time: {}".format(self.timestamp))
 
-    def measure_deadtime(self, ranges):
+    @staticmethod
+    def get_unique_filename(filename):
         """
-        Empirically measure and plot the deadtime from time tags from saturating measurement.
+        When saving data, if filename exists, then save to file name based on iterator
 
-        Inputs:
-            ranges (nx1): [m] range array
+        Params:
+            filename (str): Original save file name
+        Returns:
+            filename (str): New save file name
         """
 
-        # Calculate inter-arrival flight times
-        flight_times = ranges / self.c * 2  # [s]
-        intr_times = np.diff(flight_times)  # [s] Inter-arrival times
+        base, ext = os.path.splitext(filename)
+        counter = 0
+        filename = f"{base}_{counter}{ext}"
+        while os.path.exists(filename):
+            filename = f"{base}_{counter}{ext}"
+            counter += 1
+        return filename
 
-        start = time.time()
-        max_val = 100e-9  # [s] capping range to explore deadtime value from inter-arrival times. Usually around 20-40
-        # ns for SPCM detectors.
-        bins = np.arange(0, max_val, self.clock_res)  # [s]
-        cnts, bin_edges = np.histogram(intr_times, bins)  # [], [s]
-        print('Time elapsed {} s'.format(time.time() - start))
 
-        # Deadtime estimate is the inter-arrival histogram peak location
-        binsize = bin_edges[1] - bin_edges[0]  # [s]
-        bin_centers = bin_edges[:-1] + 0.5 * binsize  # [s]
-        bin_widths = np.diff(bin_edges)  # [s]
-        deadtime_estimate = bin_centers[np.argmax(cnts)]  # [s]
-        print('Deadtime Estimate: {:.4f} ns'.format(deadtime_estimate * 1e9))
-        setattr(self, f"deadtime_{'lg' if self.low_gain else 'hg'}", deadtime_estimate)
 
-        # Plot inter-arrival time histogram
-        xmax = deadtime_estimate * 1e9  # [ns]
-        ymax = cnts.max()
-        fig = plt.figure(dpi=400, figsize=(4, 3))
-        ax = fig.add_subplot(111)
-        ax.bar(bin_centers * 1e9, cnts, width=bin_widths*1e9, align="edge", edgecolor="black")
-        ax.annotate("Deadtime Estimate {:.1f} ns".format(deadtime_estimate*1e9), xy=(xmax, ymax),
-                    xytext=(xmax, 1.3 * ymax), ha="center", va="bottom", arrowprops=dict(arrowstyle="->"))
-        ax.set_xlabel("$\Delta t$ [ns]")
-        ax.set_ylabel("Counts")
-        ax.set_title('Inter-Arrival Times {} Channel\n{}'.format("Low-Gain" if self.low_gain is True else "High-Gain", self.timestamp))
-        ax.set_ylim(0, 1.5 * ymax)
-        plt.tight_layout()
-        plt.show()
+
+
+
+
+
+
+
+
+
+
+
 
