@@ -16,7 +16,7 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_1_-_2025-09-13_21.47.46.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-09-13_22.52.22.ARSENL'  # main data file name
 
 process_params:
   load_ylim: False   # Set TRUE to limit vertical range when generating histogram
@@ -24,27 +24,28 @@ process_params:
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
-  mueller: False  # Set TRUE if user desires to apply standar Mueller correction to histogram
-  estimate_deadtime: True  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
+  mueller: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram. 
+  estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
 
 plot_params:
-  plot_ylim: False  # Set TRUE to limit vertical range when plotting
+  plot_ylim: True  # Set TRUE to limit vertical range when plotting
   plot_xlim: False  # Set TRUE to limit horizontal range when plotting
-  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
   tbinsize: 0.1                    # [s] temporal bin size
   rbinsize: 0.1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
-  ylim: [1.9, 2.1]  # [km]
+  ylim: [0.995, 1.035]  # [km]
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [75, 125]  # [s] 
-  chunk_start: 0  # Starting chunk when plotting chunks (0 indexed)
+  xlim: [1650, 1655]  # [s] 
+  chunk_start: 30  # Starting chunk when plotting chunks (0 indexed)
   chunk_num: 4  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.05    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  alpha: 1  # set transparency in scatter plot

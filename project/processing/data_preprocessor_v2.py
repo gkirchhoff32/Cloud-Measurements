@@ -1,8 +1,5 @@
-"""
-data_conditioning.py
 
-This defines methods that are important for preparing .ARSENL data for processing
-"""
+
 
 import numpy as np
 import time
@@ -51,7 +48,6 @@ class DeadtimeCorrect:
 
         self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
 
-
     def mueller_correct(self, histogram_results, loader, plotter):
         flux_raw = histogram_results['flux_raw']
         r_binedges = histogram_results['r_binedges']
@@ -66,7 +62,7 @@ class DeadtimeCorrect:
             if (show_hg == 'Y') or (show_hg == 'y'):
                 plot_xlim, plot_ylim = plotter.plot_xlim, plotter.plot_ylim
                 plotter.plot_xlim, plotter.plot_ylim = False, False
-                plotter.plot_histogram(histogram_results)
+                plotter.plot_histogram(histogram_results, loader)
                 plotter.plot_xlim, plotter.plot_ylim = plot_xlim, plot_ylim
                 break
             elif (show_hg == 'N') or (show_hg == 'n'):
@@ -87,7 +83,7 @@ class DeadtimeCorrect:
 
         print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
         if flux_bg >= 25e3:  # [Hz]
-            print('Background estimate too high. Recommend to check background range values...')
+            print('Background estimate relatively high. Recommend to check background range values...')
             user_quit = input('Quit? (Y/N)')
             if (user_quit == 'Y') or (user_quit == 'y'):
                 quit()
@@ -97,12 +93,12 @@ class DeadtimeCorrect:
         plotter.cbar_max = flux_bg_sub.max()  # [Hz]
         plotter.cbar_min = flux_bg  # [Hz]
         plotter.flux_bg_sub = True
-        plotter.plot_histogram(histogram_results)
+        plotter.plot_histogram(histogram_results, loader)
 
         # Mueller corrected and background subtracted
         histogram_results['flux_bg_sub'] = flux_m_bg_sub  # [Hz]
         histogram_results['flux_bg'] = flux_m_bg  # [Hz]
-        plotter.plot_histogram(histogram_results)
+        plotter.plot_histogram(histogram_results, loader)
 
     def measure_deadtime(self, ranges, loader):
         """
@@ -177,6 +173,7 @@ class DataPlotter:
         self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
         self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
         # then it will plot the available ones
+        self.alpha = config['plot_params']['alpha']  # alpha value when plotting
 
     def plot_histogram(self, histogram_results, loader):
         """
@@ -251,7 +248,7 @@ class DataPlotter:
 
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
-        ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, linewidths=0)
+        ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, alpha=self.alpha, linewidths=0)
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
             [0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
@@ -281,12 +278,13 @@ class DataLoader:
         self.shots_time_tot = []
         self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
 
+        # Constants
+        self.c = config['constants']['c']  # [m/s] speed of light
+
         # System Params
         self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
         self.unwrap_modulo = config['system_params']['unwrap_modulo']  # clock rollover count
-        # self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
-        # self.deadtime_hg = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
-        # self.deadtime_lg = config['system_params']['deadtime_lg']  # [s] low-gain detector deadtime
+        self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
 
         # Process params
         self.load_ylim = config['process_params']['load_ylim']  # TRUE value limits range when generating histogram
@@ -311,6 +309,7 @@ class DataLoader:
         self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
         self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
         # then it will plot the available ones
+        self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
 
     def preprocess(self):
         """
@@ -498,7 +497,7 @@ class DataLoader:
         shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
         if self.estimate_deadtime:
-            deadtime.measure_deadtime(ranges)
+            deadtime.measure_deadtime(ranges, self)
 
         if self.load_xlim:
             max_shots_idx = np.argmin(np.abs(shots_time - max_time))

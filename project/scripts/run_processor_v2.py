@@ -12,6 +12,7 @@ from pathlib import Path
 
 from project.processing.data_preprocessor_v2 import DataProcessor
 
+
 def main():
     """
     Load .ARSENL file --> preprocess to netcdf file --> generate and display histogram or display scatter plot
@@ -21,9 +22,9 @@ def main():
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    # TODO: Testing if it can create nc file and plot it. Next, test histogram function. Then Mueller correction.
     dp = DataProcessor(config)
     dp.run()
+
 
 if __name__ == '__main__':
     main()
