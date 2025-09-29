@@ -142,6 +142,14 @@ class DeadtimeCorrect:
         plt.tight_layout()
         plt.show()
 
+    def calc_af_hist(self, histogram_results):
+        flux_raw = histogram_results['flux_raw']
+        r_binedges = histogram_results['r_binedges']
+        t_binedges = histogram_results['t_binedges']
+
+        
+
+
 
 class DataPlotter:
     def __init__(self, config):
