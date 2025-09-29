@@ -25,6 +25,8 @@ class DataProcessor:
         self.loader.preprocess()
         if self.deadtime.mueller:
             histogram_results = self.loader.gen_histogram(self.deadtime)
+            self.deadtime.calc_af_hist(histogram_results, self.loader)
+            quit()
             self.deadtime.mueller_correct(histogram_results, self.loader, self.plotter)
         else:
             if self.plotter.histogram:
@@ -142,12 +144,17 @@ class DeadtimeCorrect:
         plt.tight_layout()
         plt.show()
 
-    def calc_af_hist(self, histogram_results):
+    def calc_af_hist(self, histogram_results, loader):
         flux_raw = histogram_results['flux_raw']
+        cnts_raw = histogram_results['cnts_raw']
         r_binedges = histogram_results['r_binedges']
         t_binedges = histogram_results['t_binedges']
+        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
 
-        
+        dt = t_binedges[1] - t_binedges[0]  # [s]
+        deadtime_nbins = np.ceil(deadtime / dt).astype(int)  # Number of bins that deadtime occupies
+
+
 
 
 
@@ -543,7 +550,8 @@ class DataLoader:
             'flux_bg_sub': flux_bg_sub,
             'bg_flux': bg_flux,
             'flux_corrected': flux_corrected,
-            'flux_raw': flux
+            'flux_raw': flux,
+            'cnts_raw': H
         }
 
     def calibrate_time(self, sync, chunk_trim):
