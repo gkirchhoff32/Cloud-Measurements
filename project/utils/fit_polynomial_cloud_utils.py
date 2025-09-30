@@ -123,7 +123,7 @@ def cheby_poly(x, M):
     x (torch array): Values to be evaluated on in chebyshev polynomial      \\ [Nx1]
     M (int)        : *Highest* order term of polynomial (e.g., x^2 --> M=2) \\ []
     Returns:
-    chebyshev polynomial matrix (torch array): Evaluated polynomial \\ [NxM]
+    chebyshev polynomial matrix (torch array): Evaluated polynomial \\ [NxM] 
     """
 
     def cheby(x, m):
@@ -131,7 +131,7 @@ def cheby_poly(x, M):
         Helper to calculate value of specific chebyshev order
         """
         T0 = x ** 0
-        T1 = x ** 1
+        T1 = x ** 1 
         if m == 0:
             return T0
         elif m == 1:

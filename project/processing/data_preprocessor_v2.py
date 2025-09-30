@@ -24,9 +24,9 @@ class DataProcessor:
 
         self.loader.preprocess()
         if self.deadtime.mueller:
-            histogram_results = self.loader.gen_histogram(self.deadtime)
-            self.deadtime.calc_af_hist(histogram_results, self.loader)
+            self.deadtime.calc_af_hist(self.loader)
             quit()
+            histogram_results = self.loader.gen_histogram(self.deadtime)
             self.deadtime.mueller_correct(histogram_results, self.loader, self.plotter)
         else:
             if self.plotter.histogram:
@@ -49,6 +49,11 @@ class DeadtimeCorrect:
         self.deadtime_lg = config['system_params']['deadtime_lg']  # [s] low-gain detector deadtime
 
         self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
+
+        # Plot params
+        self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
+        self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
+
 
     def mueller_correct(self, histogram_results, loader, plotter):
         flux_raw = histogram_results['flux_raw']
@@ -144,15 +149,45 @@ class DeadtimeCorrect:
         plt.tight_layout()
         plt.show()
 
-    def calc_af_hist(self, histogram_results, loader):
-        flux_raw = histogram_results['flux_raw']
-        cnts_raw = histogram_results['cnts_raw']
-        r_binedges = histogram_results['r_binedges']
-        t_binedges = histogram_results['t_binedges']
+    def calc_af_hist(self, loader):
+        loader.load_chunk()
+
+        ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])
+        shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])
+        dr = self.rbinsize  # [m]
+        dt = self.tbinsize  # [s]
+
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
 
-        dt = t_binedges[1] - t_binedges[0]  # [s]
-        deadtime_nbins = np.ceil(deadtime / dt).astype(int)  # Number of bins that deadtime occupies
+        shots_use = shots_time[:10]
+        shots_vals = np.unique(shots_use)  # [s]
+        pulse_width = 750e-12  # [s]
+        rmin_res_t = pulse_width  # [s]
+        rmin_res_r = pulse_width * self.c / 2  # [m]
+        rvals = np.arange(0, (self.c / 2 / self.PRF) + rmin_res_r, rmin_res_r)  # [m]
+        af = np.ones((len(shots_vals), len(rvals)))
+        deadtime_nbins = np.ceil(deadtime / rmin_res_t).astype(int)
+
+        shot_indices = [np.where(shots_use == val)[0] for val in shots_vals]
+        for i in range(len(shot_indices)):
+            ranges_shot = ranges[shot_indices[i]]
+            deadtime_start_idx = np.abs(rvals[:, None] - ranges_shot).argmin(axis=0)
+            deadtime_end_idx = deadtime_start_idx + deadtime_nbins
+            deadtime_end_idx[deadtime_end_idx > len(rvals)] = len(rvals)  # remove wrap-around leakage indices of deadtime bins into next laser shot
+
+            zero_mask = np.zeros(af.shape[1], dtype=bool)
+            zero_mask[np.concatenate([np.arange(s, e) for s, e in zip(deadtime_start_idx, deadtime_end_idx)])] = True
+
+            af[i, zero_mask] = 0
+            print(af)
+
+
+
+        print(af)
+
+
+
+        print('nothing')
 
 
 
@@ -264,8 +299,8 @@ class DataPlotter:
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
         ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, alpha=self.alpha, linewidths=0)
-        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
-            [0, self.c / 2 / self.PRF / 1e3])
+        # ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
+        #     [0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
@@ -451,6 +486,12 @@ class DataLoader:
                 # Convert to flight times and range
                 flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25-ps increments
                 ranges = flight_times * self.c / 2  # [m]
+
+                # TODO: Check that this works
+                # Remove invalid range values
+                r_valid_idx = np.where[ranges <= self.c / 2 / self.PRF]
+                ranges[r_valid_idx] = ranges
+                shots_time[r_valid_idx] = shots_time
 
                 # Range correct for path-length difference
                 if (self.range_shift_correct is True) and (self.low_gain is False):
