@@ -13,7 +13,6 @@ import glob
 import re
 from datetime import datetime
 
-
 class DataProcessor:
     def __init__(self, config):
         self.loader = DataLoader(config)
@@ -159,7 +158,7 @@ class DeadtimeCorrect:
 
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
 
-        shots_use = shots_time[:10]
+        shots_use = shots_time[:1000000]
         shots_vals = np.unique(shots_use)  # [s]
         pulse_width = 750e-12  # [s]
         rmin_res_t = pulse_width  # [s]
@@ -168,26 +167,31 @@ class DeadtimeCorrect:
         af = np.ones((len(shots_vals), len(rvals)))
         deadtime_nbins = np.ceil(deadtime / rmin_res_t).astype(int)
 
+        start_time = time.time()
         shot_indices = [np.where(shots_use == val)[0] for val in shots_vals]
-        for i in range(len(shot_indices)):
-            ranges_shot = ranges[shot_indices[i]]
-            deadtime_start_idx = np.abs(rvals[:, None] - ranges_shot).argmin(axis=0)
-            deadtime_end_idx = deadtime_start_idx + deadtime_nbins
-            deadtime_end_idx[deadtime_end_idx > len(rvals)] = len(rvals)  # remove wrap-around leakage indices of deadtime bins into next laser shot
+        n_bins = len(rvals)
+        for i, idx in enumerate(shot_indices):
+            # Shot-specific ranges
+            ranges_shot = ranges[idx]
 
-            zero_mask = np.zeros(af.shape[1], dtype=bool)
-            zero_mask[np.concatenate([np.arange(s, e) for s, e in zip(deadtime_start_idx, deadtime_end_idx)])] = True
+            # Find nearest rvals index for each range
+            deadtime_start_idx = np.searchsorted(rvals, ranges_shot, side='left')
+            deadtime_end_idx = np.clip(deadtime_start_idx + deadtime_nbins, a_min=0, a_max=n_bins)
 
-            af[i, zero_mask] = 0
-            print(af)
+            # Build difference array (size+1 for safe subtraction)
+            diff = np.zeros(n_bins + 1, dtype=np.int32)
+            diff[deadtime_start_idx] += 1
+            diff[deadtime_end_idx] -= 1
+
+            # Build mask by cumulative sum
+            mask = (np.cumsum(diff[:-1]) > 0)
+
+            # Zero out af for this shot group
+            af[i, mask] = 0
 
 
-
-        print(af)
-
-
-
-        print('nothing')
+        print('Elapsed time: {} s'.format(time.time()-start_time))
+        quit()
 
 
 
@@ -487,11 +491,14 @@ class DataLoader:
                 flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25-ps increments
                 ranges = flight_times * self.c / 2  # [m]
 
-                # TODO: Check that this works
+                # print(ranges[ranges >= (self.c / 2 / self.PRF)])
+
                 # Remove invalid range values
-                r_valid_idx = np.where[ranges <= self.c / 2 / self.PRF]
-                ranges[r_valid_idx] = ranges
-                shots_time[r_valid_idx] = shots_time
+                r_valid_idx = np.where(ranges <= (self.c / 2 / self.PRF))
+                ranges = ranges[r_valid_idx]
+                shots_time = shots_time[r_valid_idx]
+
+                # print(ranges[ranges >= (self.c / 2 / self.PRF)])
 
                 # Range correct for path-length difference
                 if (self.range_shift_correct is True) and (self.low_gain is False):

@@ -16,7 +16,7 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_1_-_2025-09-13_22.16.13.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-09-13_21.47.46.ARSENL'  # main data file name
 
 process_params:
   load_ylim: False   # Set TRUE to limit vertical range when generating histogram
@@ -24,7 +24,7 @@ process_params:
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
-  mueller: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram. 
+  mueller: True  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram. 
   estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
 
 plot_params:
