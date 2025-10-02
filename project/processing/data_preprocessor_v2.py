@@ -20,13 +20,12 @@ class DataProcessor:
         self.deadtime = DeadtimeCorrect(config)
 
     def run(self):
-
         self.loader.preprocess()
         if self.deadtime.mueller:
-            self.deadtime.calc_af_hist(self.loader)
-            quit()
             histogram_results = self.loader.gen_histogram(self.deadtime)
-            self.deadtime.mueller_correct(histogram_results, self.loader, self.plotter)
+            # self.deadtime.mueller_correct(histogram_results, self.loader, self.plotter)
+            af = self.deadtime.calc_af_hist(self.loader)
+            self.deadtime.binwise_correct(af, histogram_results)
         else:
             if self.plotter.histogram:
                 histogram_results = self.loader.gen_histogram(self.deadtime)
@@ -53,6 +52,14 @@ class DeadtimeCorrect:
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
+    def binwise_correct(self, af, histogram_results):
+        t_binedges = histogram_results['t_binedges']  # [s]
+        r_binedges = histogram_results['r_binedges']  # [m]
+        flux_raw = histogram_results['flux_raw']  # [Hz]
+
+
+
+        return None
 
     def mueller_correct(self, histogram_results, loader, plotter):
         flux_raw = histogram_results['flux_raw']
@@ -78,13 +85,14 @@ class DeadtimeCorrect:
 
         bg_ranges = input("\nEnter ranges [km] to estimate background (format: min1,max1): ")
         min_bg, max_bg = map(float, bg_ranges.split(","))  # [km]
-        plotter.bg_edges = [min_bg, max_bg]
-        bg_edges_idx = [np.argmin(np.abs(r_binedges - plotter.bg_edges[0] * 1e3)), np.argmin(np.abs(r_binedges - plotter.bg_edges[1] * 1e3))]
+        plotter.bg_edges = np.array([min_bg, max_bg]) * 1e3  # [m]
 
-        # Subtract background for both deadtime corrected and uncorrected cases
-        flux_bg = np.mean(flux_raw[bg_edges_idx[0]:bg_edges_idx[1], :])
+        # Calculate background for corrected and uncorrected cases
+        flux_bg = loader.calc_bg(flux_raw, r_binedges, plotter.bg_edges)  # [Hz]
+        flux_m_bg = loader.calc_bg(flux_mueller, r_binedges, plotter.bg_edges)  # [Hz]
+
+        # Subtract background
         flux_bg_sub = flux_raw - flux_bg  # [Hz] flux with background subtracted
-        flux_m_bg = np.mean(flux_mueller[bg_edges_idx[0]:bg_edges_idx[1], :])
         flux_m_bg_sub = flux_mueller - flux_m_bg  # [Hz] flux with mueller correction and background subtracted
 
         print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
@@ -153,12 +161,10 @@ class DeadtimeCorrect:
 
         ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])
-        dr = self.rbinsize  # [m]
-        dt = self.tbinsize  # [s]
 
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
 
-        shots_use = shots_time[:1000000]
+        shots_use = shots_time[:10000]
         shots_vals = np.unique(shots_use)  # [s]
         pulse_width = 750e-12  # [s]
         rmin_res_t = pulse_width  # [s]
@@ -189,12 +195,9 @@ class DeadtimeCorrect:
             # Zero out af for this shot group
             af[i, mask] = 0
 
-
         print('Elapsed time: {} s'.format(time.time()-start_time))
-        quit()
 
-
-
+        return af
 
 
 class DataPlotter:
@@ -582,8 +585,7 @@ class DataLoader:
                 self.tbinsize * self.PRF)  # [Hz] Backscatter flux $\Phi = n/N/(\Delta t)$,
 
         # Estimate background flux
-        bg_edges_idx = [np.argmin(np.abs(rbins - self.bg_edges[0])), np.argmin(np.abs(rbins - self.bg_edges[1]))]
-        bg_flux = np.mean(flux[bg_edges_idx[0]:bg_edges_idx[1], :])
+        bg_flux = self.calc_bg(flux, rbins, self.bg_edges)
         flux_bg_sub = flux - bg_flux  # [Hz] flux with background subtracted
 
         rbins_centers = (r_binedges + 0.5 * (r_binedges[1] - r_binedges[0]))[:-1]
@@ -694,6 +696,14 @@ class DataLoader:
         # Convert to datetime if useful
         self.timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
         print("Measurement time: {}".format(self.timestamp))
+
+    @staticmethod
+    def calc_bg(flux, rbins, bg_edges):
+        # Estimate background flux
+        bg_edges_idx = [np.argmin(np.abs(rbins - bg_edges[0])), np.argmin(np.abs(rbins - bg_edges[1]))]
+        bg_flux = np.mean(flux[bg_edges_idx[0]:bg_edges_idx[1], :])  # [Hz]
+
+        return bg_flux
 
     @staticmethod
     def get_unique_filename(filename):
