@@ -11,8 +11,8 @@ system_params:
 file_params:
   date: '/20251001'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # date: '/Timing and Range Tests/range_test'
-  data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
-  # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
+  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
@@ -28,7 +28,7 @@ process_params:
   estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
 
 plot_params:
-  plot_ylim: False  # Set TRUE to limit vertical range when plotting
+  plot_ylim: True  # Set TRUE to limit vertical range when plotting
   plot_xlim: False  # Set TRUE to limit horizontal range when plotting
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
@@ -37,15 +37,15 @@ plot_params:
   tbinsize: 0.1                    # [s] temporal bin size
   rbinsize: 0.1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
-  ylim: [0.995, 1.035]  # [km]
+  ylim: [0, 4]  # [km]
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [1650, 1655]  # [s] 
+  xlim: [177.8, 178.8]  # [s] 
   chunk_start: 0  # Starting chunk when plotting chunks (0 indexed)
   chunk_num: 6  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot

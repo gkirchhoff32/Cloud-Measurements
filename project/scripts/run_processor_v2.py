@@ -16,7 +16,6 @@ def main():
     """
     Load .ARSENL file --> preprocess to netcdf file --> generate and display histogram or display scatter plot
     """
-
     config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
     with open(config_path) as f:
         config = yaml.safe_load(f)

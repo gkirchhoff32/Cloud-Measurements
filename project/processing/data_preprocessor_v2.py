@@ -306,8 +306,8 @@ class DataPlotter:
         fig = plt.figure(dpi=self.dpi, figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
         ax.scatter(shots_time, ranges / 1e3, s=self.dot_size, alpha=self.alpha, linewidths=0)
-        # ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
-        #     [0, self.c / 2 / self.PRF / 1e3])
+        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
+            [0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
