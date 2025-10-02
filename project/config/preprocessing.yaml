@@ -16,7 +16,7 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_1_-_2025-10-01_00.26.24.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-10-01_00.26.24.ARSENL'  # main data file name
 
 process_params:
   load_ylim: False   # Set TRUE to limit vertical range when generating histogram
@@ -47,5 +47,5 @@ plot_params:
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot
