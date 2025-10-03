@@ -170,7 +170,7 @@ class DeadtimeCorrect:
         cutoff = 100_000
         shots_use = shots_time[:cutoff]  # [s]
         ranges_use = ranges[:cutoff]  # [m]
-        chunk_time = dt_hist  # [s]
+        chunk_time = dt_hist * 1  # [s]
         # Compute bin index for each shot
         bins = ((shots_use - 1) // chunk_time) + 1  # +1 so 0–50 = bin 1, 51–100 = bin 2, etc.
 
@@ -186,8 +186,9 @@ class DeadtimeCorrect:
 
         pulse_width = 750e-12  # [s]
         rmin_res_t = pulse_width  # [s]
-        rmin_res_r = pulse_width * self.c / 2  # [m]
-        rvals = np.arange(0, (self.c / 2 / self.PRF) + rmin_res_r, rmin_res_r)  # [m]
+        dr_af = pulse_width * self.c / 2  # [m]
+        dt_af = 1 / self.PRF  # [s]
+        rvals = np.arange(0, (self.c / 2 / self.PRF) + dr_af, dr_af)  # [m]
         deadtime_nbins = np.ceil(deadtime / rmin_res_t).astype(int)
         n_bins = len(rvals)
         af_hist = np.ones((len(histogram_results['r_binedges']), len(histogram_results['t_binedges'])))
@@ -214,6 +215,12 @@ class DeadtimeCorrect:
 
                 # Zero out af for this shot group
                 af[i, mask] = 0
+
+            # TODO: Look into skimage.transform.resize to see if you can downsample af histogram to arbitrary size
+
+            nt_af, nr_af = af.shape
+            nt_hist = chunk_time / dt_hist
+
 
 
             print('Elapsed time: {} s'.format(time.time() - start_time))
