@@ -16,7 +16,7 @@ file_params:
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-10-01_00.26.24.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-09-30_22.40.44.ARSENL'  # main data file name
 
 process_params:
   load_ylim: False   # Set TRUE to limit vertical range when generating histogram
@@ -28,7 +28,7 @@ process_params:
   estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
 
 plot_params:
-  plot_ylim: True  # Set TRUE to limit vertical range when plotting
+  plot_ylim: False  # Set TRUE to limit vertical range when plotting
   plot_xlim: False  # Set TRUE to limit horizontal range when plotting
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
@@ -41,11 +41,11 @@ plot_params:
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
   xlim: [177.8, 178.8]  # [s] 
-  chunk_start: 0  # Starting chunk when plotting chunks (0 indexed)
-  chunk_num: 8  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
+  chunk_start: 51  # Starting chunk when plotting chunks (0 indexed)
+  chunk_num: 4  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.0001    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot
