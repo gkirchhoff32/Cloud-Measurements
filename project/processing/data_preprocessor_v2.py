@@ -45,8 +45,11 @@ class DeadtimeCorrect:
         self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
         self.deadtime_hg = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
         self.deadtime_lg = config['system_params']['deadtime_lg']  # [s] low-gain detector deadtime
+        self.pulse_width = config['system_params']['pulse_width']  # [s] FWHM
 
+        # Process Params
         self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
+        self.chunk_time = config['process_params']['chunk_time']  # [s]
 
         # Plot params
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
@@ -157,22 +160,29 @@ class DeadtimeCorrect:
         plt.show()
 
     def calc_af_hist(self, histogram_results, loader):
+        hist_t_binedges = histogram_results['t_binedges']
+        hist_r_binedges = histogram_results['r_binedges']
+
         loader.load_chunk()
 
         dr_hist = loader.rbinsize
         dt_hist = loader.tbinsize
 
+        hist_t_bins_num = len(hist_t_binedges) - 1
+        hist_r_bins_num = len(hist_r_binedges) - 1
+        hist_t_bins_num = int(hist_t_bins_num - (hist_t_bins_num % (self.chunk_time / dt_hist)))
+
         ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])  # [m]
         shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])  # [s]
 
+        cutoff_idx = np.argmin(np.abs(shots_time - (hist_t_binedges[hist_t_bins_num] + dt_hist)))
+        shots_use = shots_time[:cutoff_idx]
+        ranges_use = ranges[:cutoff_idx]
+
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
 
-        cutoff = 100_000
-        shots_use = shots_time[:cutoff]  # [s]
-        ranges_use = ranges[:cutoff]  # [m]
-        chunk_time = dt_hist * 1  # [s]
         # Compute bin index for each shot
-        bins = ((shots_use - 1) // chunk_time) + 1  # +1 so 0–50 = bin 1, 51–100 = bin 2, etc.
+        bins = shots_use // self.chunk_time  #
 
         # Group into chunks
         shots_chunks = []
@@ -181,17 +191,16 @@ class DeadtimeCorrect:
             shots_chunks.append(shots_use[bins == b])
             ranges_chunks.append(ranges_use[bins == b])
 
-        # for k, v in chunks.items():
-        #     print(f"Chunk {k}: {v}")
-
-        pulse_width = 750e-12  # [s]
-        rmin_res_t = pulse_width  # [s]
-        dr_af = pulse_width * self.c / 2  # [m]
+        rmin_res_t = self.pulse_width  # [s]
+        dr_af = rmin_res_t * self.c / 2  # [m]
         dt_af = 1 / self.PRF  # [s]
+
         rvals = np.arange(0, (self.c / 2 / self.PRF) + dr_af, dr_af)  # [m]
         deadtime_nbins = np.ceil(deadtime / rmin_res_t).astype(int)
         n_bins = len(rvals)
-        af_hist = np.ones((len(histogram_results['r_binedges']), len(histogram_results['t_binedges'])))
+
+        # TODO: Check each chunk and see if you can average into each one uniformly
+        af_hist = np.ones((hist_r_bins_num, hist_t_bins_num))
         start_time = time.time()
         for __, (shots_use_chunk, ranges_use_chunk) in enumerate(zip(shots_chunks, ranges_chunks), start=1):
             shots_vals = np.unique(shots_use_chunk)
@@ -215,50 +224,24 @@ class DeadtimeCorrect:
 
                 # Zero out af for this shot group
                 af[i, mask] = 0
+            print('nope')
 
-            # TODO: Look into skimage.transform.resize to see if you can downsample af histogram to arbitrary size
 
-            nt_af, nr_af = af.shape
-            nt_hist = chunk_time / dt_hist
+
+
+
+            # From 'gen_histogram' function, histogram resolutions should be formatted to be multiples of minimum resolutions
+            # TODO: now the cutoff of the histogram is dictated by load_xlim.
+            #  The histogram should be divisible in range and divisible and modulo (per chunk) in time.
+            #  Next step is to downsample averaging?
+
+            N, M = af.shape
+            r_factor = max(1, round(dr_hist / dr_af))
+            t_factor = max(1, round(dt_hist / dt_af))
 
 
 
             print('Elapsed time: {} s'.format(time.time() - start_time))
-
-
-        # shots_vals = np.unique(shots_use)  # [s]
-        # pulse_width = 750e-12  # [s]
-        # rmin_res_t = pulse_width  # [s]
-        # rmin_res_r = pulse_width * self.c / 2  # [m]
-        # rvals = np.arange(0, (self.c / 2 / self.PRF) + rmin_res_r, rmin_res_r)  # [m]
-        # af = np.ones((len(shots_vals), len(rvals)))
-        # deadtime_nbins = np.ceil(deadtime / rmin_res_t).astype(int)
-
-        # start_time = time.time()
-        # shot_indices = [np.where(shots_use == val)[0] for val in shots_vals]
-        # n_bins = len(rvals)
-        # for i, idx in enumerate(shot_indices):
-        #     # Shot-specific ranges
-        #     ranges_shot = ranges[idx]
-        #
-        #     # Find nearest rvals index for each range
-        #     deadtime_start_idx = np.searchsorted(rvals, ranges_shot, side='left')
-        #     deadtime_end_idx = np.clip(deadtime_start_idx + deadtime_nbins, a_min=0, a_max=n_bins)
-        #
-        #     # Build difference array (size+1 for safe subtraction)
-        #     diff = np.zeros(n_bins + 1, dtype=np.int32)
-        #     diff[deadtime_start_idx] += 1
-        #     diff[deadtime_end_idx] -= 1
-        #
-        #     # Build mask by cumulative sum
-        #     mask = (np.cumsum(diff[:-1]) > 0)
-        #
-        #     # Zero out af for this shot group
-        #     af[i, mask] = 0
-        #
-        # print('Elapsed time: {} s'.format(time.time()-start_time))
-
-        # return af
 
 
 class DataPlotter:
@@ -403,6 +386,7 @@ class DataLoader:
         self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
         self.unwrap_modulo = config['system_params']['unwrap_modulo']  # clock rollover count
         self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
+        self.pulse_width = config['system_params']['pulse_width']  # [s] FWHM
 
         # Process params
         self.load_ylim = config['process_params']['load_ylim']  # TRUE value limits range when generating histogram
@@ -411,6 +395,7 @@ class DataLoader:
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
         self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
+        self.chunk_time = config['process_params']['chunk_time']  # [s]
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
@@ -555,14 +540,10 @@ class DataLoader:
                 flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25-ps increments
                 ranges = flight_times * self.c / 2  # [m]
 
-                # print(ranges[ranges >= (self.c / 2 / self.PRF)])
-
                 # Remove invalid range values
                 r_valid_idx = np.where(ranges <= (self.c / 2 / self.PRF))
                 ranges = ranges[r_valid_idx]
                 shots_time = shots_time[r_valid_idx]
-
-                # print(ranges[ranges >= (self.c / 2 / self.PRF)])
 
                 # Range correct for path-length difference
                 if (self.range_shift_correct is True) and (self.low_gain is False):
@@ -611,17 +592,19 @@ class DataLoader:
             flux_raw [Hz]: (nxm) uncorrected flux
         """
 
-        if self.load_xlim:
-            min_time = self.xlim[0]  # [s]
-            max_time = self.xlim[1]  # [s]
-        if self.load_ylim:
-            min_range = self.ylim[0] * 1e3  # [m]
-            max_range = self.ylim[1] * 1e3  # [m]
-
         self.load_chunk()
 
         ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
+
+        if self.load_xlim:
+            min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
+        else:
+            min_time, max_time = shots_time[0], shots_time[-1]  # [s]
+        if self.load_ylim:
+            min_range, max_range = (self.ylim[0] * 1e3), (self.ylim[1] * 1e3)  # [m]
+        else:
+            min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
 
         if self.estimate_deadtime:
             deadtime.measure_deadtime(ranges, self)
@@ -631,6 +614,32 @@ class DataLoader:
             min_shots_idx = np.argmin(np.abs(shots_time - min_time))
             shots_time = shots_time[min_shots_idx:max_shots_idx]
             ranges = ranges[min_shots_idx:max_shots_idx]
+
+        # Round to nearest integer factor for binning. This is for ease of AF calculation later.
+        dr_af = self.pulse_width * self.c / 2  # [m]
+        dt_af = 1 / self.PRF  # [s]
+
+        M = round(self.chunk_time / dt_af)
+        if (M % 1) != 0:
+            print("'self.chunk_time' value in config file is not a multiple of native time resolution (~70 us). Please "
+                  "check this before continuing...")
+            quit()
+        r_factor = max(1, round(self.rbinsize / dr_af))
+        t_factor = max(1, round(self.tbinsize / dt_af))
+        rbinsize_close = r_factor * dr_af  # [m]
+        tbinsize_close = t_factor * dt_af  # [s]
+        if abs(M / tbinsize_close - round(M / tbinsize_close)) >= 1e-9:
+            tfactors = np.array([f for f in range(1, M + 1) if M % f == 0])
+            dt_candidates = tfactors * dt_af
+            t_factor = tfactors[np.argmin(np.abs(dt_candidates - self.tbinsize))]
+            tbinsize_close = t_factor * dt_af  # [s]
+
+        input("Are these approximate resolutions acceptable: {:.3e} m x {:.3e} s? "
+              "Press any key to continue...".format(rbinsize_close, tbinsize_close))
+
+        self.rbinsize = rbinsize_close
+        self.tbinsize = tbinsize_close
+        print('Actual range and time bin sizes: {:.3f} m x {:.3f} s'.format(self.rbinsize, self.tbinsize))
 
         print('\nStarting to generate histogram...')
         start = time.time()
