@@ -17,18 +17,18 @@ class DataProcessor:
     def __init__(self, config):
         self.loader = DataLoader(config)
         self.plotter = DataPlotter(config)
-        self.deadtime = DeadtimeCorrect(config)
+        self.deadtime_correct = DeadtimeCorrect(config)
 
     def run(self):
         self.loader.preprocess()
-        if self.deadtime.mueller:
-            histogram_results = self.loader.gen_histogram(self.deadtime)
-            # self.deadtime.mueller_correct(histogram_results, self.loader, self.plotter)
-            af = self.deadtime.calc_af_hist(histogram_results, self.loader)
-            self.deadtime.binwise_correct(af, histogram_results)
+        if self.deadtime_correct.mueller:
+            histogram_results = self.loader.gen_histogram(self.deadtime_correct)
+            # self.deadtime_correct.mueller_correct(histogram_results, self.loader, self.plotter)
+            af = self.deadtime_correct.calc_af_hist(histogram_results, self.loader)
+            self.deadtime_correct.binwise_correct(af, histogram_results)
         else:
             if self.plotter.histogram:
-                histogram_results = self.loader.gen_histogram(self.deadtime)
+                histogram_results = self.loader.gen_histogram(self.deadtime_correct)
                 self.plotter.plot_histogram(histogram_results, self.loader)
             else:
                 self.plotter.plot_scatter(self.loader)
@@ -162,20 +162,25 @@ class DeadtimeCorrect:
     def calc_af_hist(self, histogram_results, loader):
         hist_t_binedges = histogram_results['t_binedges']
         hist_r_binedges = histogram_results['r_binedges']
+        min_range_include_deadtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
+        min_range = loader.ylim[0] * 1e3  # [m]
 
         loader.load_chunk()
-
         dr_hist = loader.rbinsize
         dt_hist = loader.tbinsize
 
-        # if self.chunk_time < dt_hist:
-        #     print('Specified chunk is smaller than the histogram temporal resolution. Setting chunk size to time bin'
-        #           'size...')
-        #     self.chunk_time = dt_hist  # [s]
+        dr_af = self.pulse_width * self.c / 2  # [m]
+        dt_af = 1 / self.PRF  # [s]
+
+        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
+        deadtime_nbins = np.ceil(deadtime / (dr_af / self.c * 2)).astype(int)
+
+        shots_per_hist_bin = round(dt_hist / dt_af)
+        num_range_per_hist_bin = round(dr_hist / dr_af)
 
         hist_t_bins_num = len(hist_t_binedges) - 1
         hist_r_bins_num = len(hist_r_binedges) - 1
-        # hist_t_bins_num = int(hist_t_bins_num - (hist_t_bins_num % (self.chunk_time / dt_hist)))
+        hist_r_bins_num -= np.floor(deadtime_nbins / num_range_per_hist_bin).astype(int)
 
         ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])  # [m]
         shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])  # [s]
@@ -184,36 +189,20 @@ class DeadtimeCorrect:
         shots_use = shots_time[:cutoff_idx]
         ranges_use = ranges[:cutoff_idx]
 
-        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
+        # TODO: include ranges before min range that can cause deadtime leakage
+        range_condition = (ranges_use <= max_range) & (ranges_use >= min_range_include_deadtime)
+        ranges_use = ranges_use[range_condition]
+        shots_use = shots_use[range_condition]
 
-        # # Compute bin index for each shot
-        # bins = shots_use // self.chunk_time  #
-        #
-        # # Group into chunks
-        # shots_chunks = []
-        # ranges_chunks = []
-        # for b in np.unique(bins):
-        #     shots_chunks.append(shots_use[bins == b])
-        #     ranges_chunks.append(ranges_use[bins == b])
-
-        rmin_res_t = self.pulse_width  # [s]
-        dr_af = rmin_res_t * self.c / 2  # [m]
-        dt_af = 1 / self.PRF  # [s]
-
-        rvals = np.arange(0, (self.c / 2 / self.PRF) + dr_af, dr_af)  # [m]
+        rvals_pre_min_range = np.arange(min_range_include_deadtime, max_range + dr_af, dr_af)  # [m]
+        rvals = np.arange(min_range, max_range + dr_af, dr_af)  # [m]
         trim_num = round(((len(rvals) * dr_af) - (len(rvals) * dr_af) % dr_hist) / dr_af)
         if trim_num != (len(rvals)-1):
             hist_r_bins_num -= 1
 
-        deadtime_nbins = np.ceil(deadtime / rmin_res_t).astype(int)
         n_bins = len(rvals)
-        shots_per_hist_bin = round(dt_hist / dt_af)
-        num_range_per_hist_bin = round(dr_hist / dr_af)
-
-        # TODO: Check af histogram roughly matches scatter plot...
 
         start_time = time.time()
-        # for __, (shots_use_chunk, ranges_use_chunk) in enumerate(zip(shots_chunks, ranges_chunks), start=1):
         shots_vals = np.unique(shots_use)
         num_dt_hist = round((shots_vals[-1] - shots_vals[0]) / dt_hist)
         shot_indices = [np.where(shots_use == val)[0] for val in shots_vals]
@@ -231,27 +220,13 @@ class DeadtimeCorrect:
             # Shot-specific ranges
             ranges_shot = ranges_use[idx]
 
-            # # Build difference array (size+1 for safe subtraction)
-            # diff = np.zeros(n_bins + 1, dtype=np.int32)
-            # diff[deadtime_start_idx] += 1
-            # diff[deadtime_end_idx] -= 1
-
             # Find nearest rvals index for each range
-            deadtime_start_idx = np.searchsorted(rvals, ranges_shot, side='left')
+            deadtime_start_idx = np.searchsorted(rvals_pre_min_range, ranges_shot, side='left')
+            deadtime_start_idx -= deadtime_nbins
             deadtime_end_idx = np.clip(deadtime_start_idx + deadtime_nbins, a_min=0, a_max=n_bins)
 
-            # dead = np.zeros(n_bins + 1, dtype=np.int32)
             for start, end in zip(deadtime_start_idx, deadtime_end_idx):
                 af[start:end, i] -= 1
-                # dead[start:end] += 1
-            # dead[deadtime_start_idx:deadtime_end_idx] += 1
-
-            # # Build mask by cumulative sum
-            # mask = (np.cumsum(diff[:-1]) > 0)
-
-            # Zero out af for this shot group
-            # af[mask, i] = 0
-            # af[:, i] -= dead
 
             af_trim = af[:trim_num, i]
             af_reshaped = af_trim.reshape(-1, num_range_per_hist_bin)
@@ -404,6 +379,8 @@ class DataLoader:
         self.unwrap_modulo = config['system_params']['unwrap_modulo']  # clock rollover count
         self.clock_res = config['system_params']['clock_res']  # [s] clock resolution
         self.pulse_width = config['system_params']['pulse_width']  # [s] FWHM
+        self.deadtime_hg = config['system_params']['deadtime_hg']  # [s]
+        self.deadtime_lg = config['system_params']['deadtime_lg']  # [s]
 
         # Process params
         self.load_ylim = config['process_params']['load_ylim']  # TRUE value limits range when generating histogram
@@ -412,7 +389,7 @@ class DataLoader:
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
         self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
-        # self.chunk_time = config['process_params']['chunk_time']  # [s]
+        self.active_fraction = config['process_params']['active_fraction']
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
@@ -595,7 +572,7 @@ class DataLoader:
             print('Finished preprocessing. File created.\n'
                   'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
 
-    def gen_histogram(self, deadtime):
+    def gen_histogram(self, deadtime_correct):
         """
         Calculate histogram from range and shots properties of netCDF file. Flux is calculated counts per range bin per
         integrated shots.
@@ -614,17 +591,17 @@ class DataLoader:
         ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
+        deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
+
         if self.load_xlim:
             min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
         else:
             min_time, max_time = shots_time[0], shots_time[-1]  # [s]
         if self.load_ylim:
-            min_range, max_range = (self.ylim[0] * 1e3), (self.ylim[1] * 1e3)  # [m]
+            reduce_min = (deadtime * self.c / 2) if self.active_fraction else 0  # To calculate deadtime impact from preceding bins
+            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m] #                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
         else:
             min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
-
-        if self.estimate_deadtime:
-            deadtime.measure_deadtime(ranges, self)
 
         if self.load_xlim:
             max_shots_idx = np.argmin(np.abs(shots_time - max_time))
