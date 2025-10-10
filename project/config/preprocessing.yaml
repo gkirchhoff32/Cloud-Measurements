@@ -38,9 +38,9 @@ plot_params:
   flux_correct: False  # Set TRUE to plot background-subtracted range-corrected flux 
 
   tbinsize: 1                    # [s] temporal bin size
-  rbinsize: 1                  # [m] range bin size
+  rbinsize: 10                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
-  ylim: [0.003, 10]  # [km] excluding last value if histogram
+  ylim: [5, 7]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
   xlim: [0, 1.1]  # [s] excluding last value if histogram

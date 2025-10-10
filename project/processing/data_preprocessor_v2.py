@@ -160,47 +160,44 @@ class DeadtimeCorrect:
         plt.show()
 
     def calc_af_hist(self, histogram_results, loader):
+        # Load relevant chunks
+        loader.load_chunk()
+        dr_hist = loader.rbinsize  # [m] histogram range resolution
+        dt_hist = loader.tbinsize  # [s] histogram time resolution
+
+        # Load bin edges. Remember, min_range_dtime is min_range minus one deadtime interval
         hist_t_binedges = histogram_results['t_binedges']
         hist_r_binedges = histogram_results['r_binedges']
-        min_range_include_deadtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
-        min_range = loader.ylim[0] * 1e3  # [m]
+        min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
 
-        loader.load_chunk()
-        dr_hist = loader.rbinsize
-        dt_hist = loader.tbinsize
-
+        # Fine-resolution bin size used to calculate active-fraction fractional binning
         dr_af = self.pulse_width * self.c / 2  # [m]
         dt_af = 1 / self.PRF  # [s]
+        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg  # [s]
 
-        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
-        deadtime_nbins = np.ceil(deadtime / (dr_af / self.c * 2)).astype(int)
-
+        # Number of fine-res bins per coarse (histogram) bin
         shots_per_hist_bin = round(dt_hist / dt_af)
-        num_range_per_hist_bin = round(dr_hist / dr_af)
+        af_rbins_per_hist_bin = round(dr_hist / dr_af)
+        deadtime_nbins = np.ceil(deadtime / (dr_af / self.c * 2)).astype(int)  # number of active-fraction
 
-        hist_t_bins_num = len(hist_t_binedges) - 1
-        hist_r_bins_num = len(hist_r_binedges) - 1
-        hist_r_bins_num -= np.floor(deadtime_nbins / num_range_per_hist_bin).astype(int)
-
+        # Unpack time-tag ranges and shots
         ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])  # [m]
         shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])  # [s]
 
-        cutoff_idx = np.argmin(np.abs(shots_time - (hist_t_binedges[hist_t_bins_num])))
-        shots_use = shots_time[:cutoff_idx]
-        ranges_use = ranges[:cutoff_idx]
+        # Limit shots and ranges to within xlim (time) window
+        start_idx = np.argmin(np.abs(shots_time - (hist_t_binedges[0])))
+        end_idx = np.argmin(np.abs(shots_time - (hist_t_binedges[-1])))
+        shots_use = shots_time[start_idx:end_idx]
+        ranges_use = ranges[start_idx:end_idx]
 
-        # TODO: include ranges before min range that can cause deadtime leakage
-        range_condition = (ranges_use <= max_range) & (ranges_use >= min_range_include_deadtime)
-        ranges_use = ranges_use[range_condition]
+        # Limit shots and ranges to within ylim (range) window
+        range_condition = (ranges_use <= max_range) & (ranges_use >= min_range_dtime)
         shots_use = shots_use[range_condition]
+        ranges_use = ranges_use[range_condition]
 
-        rvals_pre_min_range = np.arange(min_range_include_deadtime, max_range + dr_af, dr_af)  # [m]
-        rvals = np.arange(min_range, max_range + dr_af, dr_af)  # [m]
-        trim_num = round(((len(rvals) * dr_af) - (len(rvals) * dr_af) % dr_hist) / dr_af)
-        if trim_num != (len(rvals)-1):
-            hist_r_bins_num -= 1
-
-        n_bins = len(rvals)
+        # Create fine-res range array
+        rvals_af = np.arange(min_range_dtime, max_range, dr_af)  # [m]
+        n_rbins_af = len(rvals_af)
 
         start_time = time.time()
         shots_vals = np.unique(shots_use)
@@ -208,31 +205,48 @@ class DeadtimeCorrect:
         shot_indices = [np.where(shots_use == val)[0] for val in shots_vals]
         shot_indices_split = []
         prior_cutoff_idx = 0
-        for num in np.arange(dt_hist, (num_dt_hist + 1) * dt_hist, dt_hist):
+        for num in np.arange(shots_vals[0] + dt_hist, shots_vals[0] + (num_dt_hist + 1) * dt_hist, dt_hist):
             shot_cutoff_idx = np.searchsorted(shots_vals, num, side='right')
             shot_indices_split.append(shot_indices[prior_cutoff_idx:shot_cutoff_idx])
             prior_cutoff_idx = shot_cutoff_idx
         shot_indices_flat = [np.concatenate(group) for group in shot_indices_split if group]
 
-        af_hist = np.zeros((hist_r_bins_num, len(shot_indices_flat)))
-        af = np.ones((trim_num, len(shot_indices_flat))) * shots_per_hist_bin
+        # Fine-res range bin index to trim so range array can integer downsample
+        trim_range_idx = round(((len(rvals_af) * dr_af) - (len(rvals_af) * dr_af) % dr_hist) / dr_af)
+
+        af_hist = np.zeros((round(trim_range_idx / af_rbins_per_hist_bin), len(shot_indices_flat)))
+        af = np.ones((trim_range_idx, len(shot_indices_flat))) * shots_per_hist_bin
         for i, idx in enumerate(shot_indices_flat):
             # Shot-specific ranges
             ranges_shot = ranges_use[idx]
 
-            # Find nearest rvals index for each range
-            deadtime_start_idx = np.searchsorted(rvals_pre_min_range, ranges_shot, side='left')
-            deadtime_start_idx -= deadtime_nbins
-            deadtime_end_idx = np.clip(deadtime_start_idx + deadtime_nbins, a_min=0, a_max=n_bins)
+            # Find nearest rvals_af index for each range
+            deadtime_start_idx = np.searchsorted(rvals_af, ranges_shot, side='left')
+            deadtime_end_idx = np.clip(deadtime_start_idx + deadtime_nbins, a_min=0, a_max=n_rbins_af)
 
             for start, end in zip(deadtime_start_idx, deadtime_end_idx):
                 af[start:end, i] -= 1
 
-            af_trim = af[:trim_num, i]
-            af_reshaped = af_trim.reshape(-1, num_range_per_hist_bin)
+            af_trim = af[:, i]
+            af_reshaped = af_trim.reshape(-1, af_rbins_per_hist_bin)
             af_hist[:, i] = af_reshaped.mean(axis=1)
 
+        af_hist = af_hist[round(deadtime_nbins / af_rbins_per_hist_bin):, :] / shots_per_hist_bin
         print('Elapsed time: {} s'.format(time.time() - start_time))
+
+        fig = plt.figure(figsize=(8, 4), dpi=400)
+        ax = fig.add_subplot(111)
+        im = ax.imshow(af_hist, aspect='auto', origin='lower', cmap='viridis',
+                       extent=[shots_vals[0] - (dt_hist / 2),
+                               shots_vals[-1] + (dt_hist / 2),
+                               hist_r_binedges[round(deadtime_nbins / af_rbins_per_hist_bin)] / 1e3,
+                               hist_r_binedges[round((trim_range_idx - 1) / af_rbins_per_hist_bin)] / 1e3])
+        cbar = fig.colorbar(im, ax=ax)
+        cbar.set_label('AF Value')
+        ax.set_xlabel('Time [s]')
+        ax.set_ylabel('Range [km]')
+        plt.show()
+
         quit()
 
 
@@ -347,6 +361,7 @@ class DataPlotter:
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
+        ax.set_aspect('equal')
         ax.set_title(
             'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))
         plt.tight_layout()
