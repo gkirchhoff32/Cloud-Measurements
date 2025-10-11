@@ -24,8 +24,8 @@ class DataProcessor:
         if self.deadtime_correct.mueller:
             histogram_results = self.loader.gen_histogram()
             # self.deadtime_correct.mueller_correct(histogram_results, self.loader, self.plotter)
-            af_hist = self.deadtime_correct.calc_af_hist(histogram_results, self.loader)
-            # self.deadtime_correct.binwise_correct(af_hist, histogram_results)
+            af_results = self.deadtime_correct.calc_af_hist(histogram_results, self.loader)
+            self.deadtime_correct.binwise_correct(af_results, histogram_results)
         else:
             if self.plotter.histogram:
                 histogram_results = self.loader.gen_histogram()
@@ -54,15 +54,6 @@ class DeadtimeCorrect:
         # Plot params
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
-
-    def binwise_correct(self, af_hist, histogram_results):
-        t_binedges = histogram_results['t_binedges']  # [s]
-        r_binedges = histogram_results['r_binedges']  # [m]
-        flux_raw = histogram_results['flux_raw']  # [Hz]
-
-
-
-        return None
 
     def mueller_correct(self, histogram_results, loader, plotter):
         flux_raw = histogram_results['flux_raw']
@@ -224,13 +215,16 @@ class DeadtimeCorrect:
             shot_indices_split.append(shot_indices[prior_cutoff_idx:shot_cutoff_idx])
             prior_cutoff_idx = shot_cutoff_idx
         shot_indices_flat = [np.concatenate(group) for group in shot_indices_split if group]  # Flatten each column
+        tbin_num = len(shot_indices_flat)  # Number of histogram time bins
 
         # Fine-res range bin index to trim up to so range array can integer downsample
         trim_range_idx = round(((len(rvals_af) * dr_af) - (len(rvals_af) * dr_af) % dr_hist) / dr_af)
+        rbin_num_trim = round(trim_range_idx / af_rbins_per_hist_bin)  # Number of histogram range bins to trim to for
+        # factorizability
 
         # Loop through each histogram time column and subtract range bins where the detector was inactive
-        af_hist = np.zeros((round(trim_range_idx / af_rbins_per_hist_bin), len(shot_indices_flat)))
-        af = np.ones((trim_range_idx, len(shot_indices_flat))) * shots_per_hist_bin
+        af_hist = np.zeros((rbin_num_trim, tbin_num))
+        af = np.ones((trim_range_idx, tbin_num)) * shots_per_hist_bin
         for i, idx in enumerate(shot_indices_flat):
             # Shot-specific ranges
             ranges_shot = ranges_use[idx]
@@ -273,7 +267,68 @@ class DeadtimeCorrect:
         ax.set_ylabel('Range [km]')
         plt.show()
 
-        return af_hist
+        return {
+            'af_hist': af_hist,
+            'rbin_num_trim': rbin_num_trim
+        }
+
+    def binwise_correct(self, af_results, histogram_results):
+        t_binedges = histogram_results['t_binedges']  # [s]
+        r_binedges = histogram_results['r_binedges']  # [m]
+        flux_raw = histogram_results['flux_raw']  # [Hz]
+        reduce_min = histogram_results['reduce_min']  # [m]
+
+        af_hist = af_results['af_hist']
+        rbin_num_trim = af_results['rbin_num_trim']
+
+        flux_raw = flux_raw[:rbin_num_trim]  # [Hz]
+        r_binedges = r_binedges[:rbin_num_trim + 1]  # [m]
+
+        # reduce_min = reduce_min / self.c * 2  # [s]
+        # dt_hist = t_binedges[1] - t_binedges[0]
+        # start_trim = round(reduce_min / dt_hist)  # number of bins to remove pre-deadtime inclusion
+        # t_binedges = t_binedges[start_trim:]
+
+        flux_est = flux_raw / af_hist
+
+        fig = plt.figure(dpi=400,
+                         figsize=(10, 5),
+                         constrained_layout=True
+                         )
+        ax1 = fig.add_subplot(211)
+        ax2 = fig.add_subplot(212)
+        mesh1 = ax1.pcolormesh(t_binedges,
+                       r_binedges / 1e3,
+                       flux_raw,
+                       cmap='viridis',
+                       norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
+                                    vmax=flux_est.max()
+                                    )
+                       )
+        mesh2 = ax2.pcolormesh(t_binedges,
+                               r_binedges / 1e3,
+                               flux_est,
+                               cmap='viridis',
+                               norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
+                                            vmax=flux_est.max()
+                                            )
+                               )
+        # ax1.set_xlabel('Time [s]')
+        ax1.set_ylabel('Range [km]')
+        ax1.set_title('Raw Flux')
+        ax1.tick_params(labelbottom=False)
+        ax2.set_xlabel('Time [s]')
+        ax2.set_ylabel('Range [km]')
+        ax2.set_title('Deadtime-Corrected Flux')
+        cbar = fig.colorbar(mesh2, ax=[ax1, ax2], location='right', pad=0.15)
+        cbar.set_label('Flux [Hz]')
+        # ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
+        #     [0, self.c / 2 / self.PRF / 1e3])
+        # ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
+        plt.tight_layout(rect=[0, 0, 0.7, 1], h_pad=2)
+        plt.show()
+
+        return None
 
 
 class DataPlotter:
@@ -301,7 +356,6 @@ class DataPlotter:
         self.save_img = config['plot_params']['save_img']  # Save images if TRUE
         self.save_dpi = config['plot_params']['save_dpi']  # DPI for saved images
         self.dot_size = config['plot_params']['dot_size']  # Dot size for 'axes.scatter' 's' param
-        self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background
         # subtracted and range corrected
         self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
         self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
@@ -318,7 +372,6 @@ class DataPlotter:
         # Processed data
         flux_raw = histogram_results['flux_raw']
         flux_bg_sub = histogram_results['flux_bg_sub']
-        bg_flux = histogram_results['bg_flux']  # [Hz] background flux
         t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
         r_binedges = histogram_results['r_binedges']  # [m] range bin edges
 
@@ -651,8 +704,9 @@ class DataLoader:
         else:
             min_time, max_time = shots_time[0], shots_time[-1]  # [s]
         if self.load_ylim:
-            reduce_min = (deadtime * self.c / 2) if self.active_fraction else 0  # To calculate deadtime impact from preceding bins
-            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m] #                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
+            reduce_min = (deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
+            # from preceding bins
+            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
         else:
             min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
 
@@ -705,7 +759,8 @@ class DataLoader:
             'flux_bg_sub': flux_bg_sub,
             'bg_flux': bg_flux,
             'flux_raw': flux,
-            'cnts_raw': H
+            'cnts_raw': H,
+            'reduce_min': reduce_min
         }
 
     def calibrate_time(self, sync, chunk_trim):
