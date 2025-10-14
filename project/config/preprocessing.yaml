@@ -10,22 +10,22 @@ system_params:
   pulse_width: 750.0e-12       # [s] Laser-pulse full-width half-maximum length
 
 file_params:
-  date: '/20251008'  # YYYYMMDD. Will search for and save files in the identically named directories. 
+  date: '/20250913'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # date: '/Timing and Range Tests/range_test'
-  data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
-  # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
+  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-10-08_22.26.35.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-09-13_22.16.13.ARSENL'  # main data file name
 
 process_params:
   load_ylim: True  # Set TRUE to limit vertical range when generating histogram
   load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
-  mueller: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram. 
-  estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
+  mueller: True  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram. 
+  # estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
 
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
@@ -33,20 +33,20 @@ process_params:
   # chunk_time: 4  # [s] size (in time) of chunks when calculating active fraction
 
 plot_params:
-  plot_ylim: False  # Set TRUE to limit vertical range when plotting
-  plot_xlim: False  # Set TRUE to limit horizontal range when plotting
-  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  plot_ylim: True  # Set TRUE to limit vertical range when plotting
+  plot_xlim: True  # Set TRUE to limit horizontal range when plotting
+  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 1                    # [s] temporal bin size
-  rbinsize: 10                  # [m] range bin size
+  tbinsize: 0.01                    # [s] temporal bin size
+  rbinsize: 1                  # [m] range bin size
   bg_edges: [10.0e+3, 10.1e+3]   # [m] bin edges used for background flux estimation
-  ylim: [5, 7]  # [km] excluding last value if histogram
+  ylim: [3, 3.2]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [0, 2.1]  # [s] excluding last value if histogram
-  chunk_start: 0  # Starting chunk when plotting chunks (0 indexed)
-  chunk_num: 4  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
+  xlim: [137, 145.6]  # [s] excluding last value if histogram
+  chunk_start: 2  # Starting chunk when plotting chunks (0 indexed)
+  chunk_num: 1  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images

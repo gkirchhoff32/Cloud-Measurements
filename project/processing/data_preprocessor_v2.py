@@ -23,9 +23,10 @@ class DataProcessor:
         self.loader.preprocess()
         if self.deadtime_correct.mueller:
             histogram_results = self.loader.gen_histogram()
-            # self.deadtime_correct.mueller_correct(histogram_results, self.loader, self.plotter)
+            mueller_results = self.deadtime_correct.mueller_correct(histogram_results, self.loader, self.plotter)
             af_results = self.deadtime_correct.calc_af_hist(histogram_results, self.loader)
-            self.deadtime_correct.binwise_correct(af_results, histogram_results)
+            dc_results = self.deadtime_correct.deadtime_model_correct(af_results, histogram_results)
+            self.deadtime_correct.plot_binwise_corrections(mueller_results, dc_results)
         else:
             if self.plotter.histogram:
                 histogram_results = self.loader.gen_histogram()
@@ -58,6 +59,7 @@ class DeadtimeCorrect:
     def mueller_correct(self, histogram_results, loader, plotter):
         flux_raw = histogram_results['flux_raw']
         r_binedges = histogram_results['r_binedges']
+        t_binedges = histogram_results['t_binedges']
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg
 
         # Calculate flux estimate based on Mueller Correction
@@ -81,13 +83,26 @@ class DeadtimeCorrect:
         min_bg, max_bg = map(float, bg_ranges.split(","))  # [km]
         plotter.bg_edges = np.array([min_bg, max_bg]) * 1e3  # [m]
 
-        # Calculate background for corrected and uncorrected cases
-        flux_bg = loader.calc_bg(flux_raw, r_binedges, plotter.bg_edges)  # [Hz]
-        flux_m_bg = loader.calc_bg(flux_mueller, r_binedges, plotter.bg_edges)  # [Hz]
+        blank_bg_est = (min_bg > r_binedges.max()) | (max_bg < r_binedges.min())
+        if blank_bg_est:
+            # TODO: Ignore background subtraction for now.
+            flux_bg = 0  # [Hz]
+            flux_m_bg = 0  # [Hz]
+        else:
+            # Calculate background for corrected and uncorrected cases
+            flux_bg = loader.calc_bg(flux_raw, r_binedges, plotter.bg_edges)  # [Hz]
+            flux_m_bg = loader.calc_bg(flux_mueller, r_binedges, plotter.bg_edges)  # [Hz]
 
         # Subtract background
         flux_bg_sub = flux_raw - flux_bg  # [Hz] flux with background subtracted
         flux_m_bg_sub = flux_mueller - flux_m_bg  # [Hz] flux with mueller correction and background subtracted
+
+        if blank_bg_est:
+            plotter.cbar_min = flux_raw[flux_raw > 0].min()
+            plotter.cbar_max = flux_mueller.max()
+        else:
+            plotter.cbar_min = flux_bg_sub[flux_bg_sub > 0].min()
+            plotter.cbar_max = flux_m_bg_sub.max()
 
         print('Background flux estimate: {:.2f} Hz'.format(flux_bg))
         if flux_bg >= 25e3:  # [Hz]
@@ -98,8 +113,6 @@ class DeadtimeCorrect:
 
         histogram_results['flux_bg_sub'] = flux_bg_sub  # [Hz]
         histogram_results['flux_bg'] = flux_bg  # [Hz]
-        plotter.cbar_max = flux_bg_sub.max()  # [Hz]
-        plotter.cbar_min = flux_bg  # [Hz]
         plotter.flux_bg_sub = True
         plotter.plot_histogram(histogram_results, loader)
 
@@ -107,6 +120,14 @@ class DeadtimeCorrect:
         histogram_results['flux_bg_sub'] = flux_m_bg_sub  # [Hz]
         histogram_results['flux_bg'] = flux_m_bg  # [Hz]
         plotter.plot_histogram(histogram_results, loader)
+
+        return {
+            'flux_m_bg_sub': flux_m_bg_sub,
+            'flux_m_bg': flux_m_bg,
+            'flux_mueller': flux_mueller,
+            'r_binedges': r_binedges,
+            't_binedges': t_binedges
+        }
 
     def measure_deadtime(self, ranges, loader):
         """
@@ -243,7 +264,8 @@ class DeadtimeCorrect:
             af_hist[:, i] = af_reshaped.mean(axis=1)
 
         # Normalize AF histogram
-        af_hist = af_hist[round(deadtime_nbins / af_rbins_per_hist_bin):, :] / shots_per_hist_bin
+        deadtime_trim_idx = round(deadtime_nbins / af_rbins_per_hist_bin)
+        af_hist = af_hist[deadtime_trim_idx:, :] / shots_per_hist_bin
 
         print('Elapsed time: {} s'.format(time.time() - start_time))
 
@@ -269,10 +291,11 @@ class DeadtimeCorrect:
 
         return {
             'af_hist': af_hist,
-            'rbin_num_trim': rbin_num_trim
+            'rbin_num_trim': rbin_num_trim,
+            'deadtime_trim_idx': deadtime_trim_idx
         }
 
-    def binwise_correct(self, af_results, histogram_results):
+    def deadtime_model_correct(self, af_results, histogram_results):
         t_binedges = histogram_results['t_binedges']  # [s]
         r_binedges = histogram_results['r_binedges']  # [m]
         flux_raw = histogram_results['flux_raw']  # [Hz]
@@ -280,9 +303,10 @@ class DeadtimeCorrect:
 
         af_hist = af_results['af_hist']
         rbin_num_trim = af_results['rbin_num_trim']
+        deadtime_trim_idx = af_results['deadtime_trim_idx']
 
-        flux_raw = flux_raw[:rbin_num_trim]  # [Hz]
-        r_binedges = r_binedges[:rbin_num_trim + 1]  # [m]
+        flux_raw = flux_raw[deadtime_trim_idx:rbin_num_trim]  # [Hz]
+        r_binedges = r_binedges[deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
 
         # reduce_min = reduce_min / self.c * 2  # [s]
         # dt_hist = t_binedges[1] - t_binedges[0]
@@ -290,6 +314,22 @@ class DeadtimeCorrect:
         # t_binedges = t_binedges[start_trim:]
 
         flux_est = flux_raw / af_hist
+
+        if af_hist.shape[1] == 1:
+            fig = plt.figure(dpi=400,
+                             figsize=(10, 5)
+                             )
+            ax = fig.add_subplot(111)
+            rcenters = r_binedges[:-1] - (r_binedges[1] - r_binedges[0]) / 2  # [m]
+            ax.plot(rcenters / 1e3, flux_raw / 1e6, label='Measured Flux', alpha=0.75)
+            ax.plot(rcenters / 1e3, flux_est / 1e6, label='Corrected Flux', alpha=0.75)
+            ax.set_xlabel('Range [km]')
+            ax.set_ylabel('Flux [MHz]')
+            ax.set_title('Deadtime Corrected Flux (1D)')
+            ax.set_yscale('log')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
 
         fig = plt.figure(dpi=400,
                          figsize=(10, 5),
@@ -301,16 +341,16 @@ class DeadtimeCorrect:
                        r_binedges / 1e3,
                        flux_raw,
                        cmap='viridis',
-                       norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
-                                    vmax=flux_est.max()
+                       norm=LogNorm(vmin=np.nanmin(flux_raw[flux_raw > 0]),
+                                    vmax=np.nanmax(flux_est)
                                     )
                        )
         mesh2 = ax2.pcolormesh(t_binedges,
                                r_binedges / 1e3,
                                flux_est,
                                cmap='viridis',
-                               norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
-                                            vmax=flux_est.max()
+                               norm=LogNorm(vmin=np.nanmin(flux_raw[flux_raw > 0]),
+                                            vmax=np.nanmax(flux_est)
                                             )
                                )
         # ax1.set_xlabel('Time [s]')
@@ -325,15 +365,92 @@ class DeadtimeCorrect:
         # ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
         #     [0, self.c / 2 / self.PRF / 1e3])
         # ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
-        plt.tight_layout(rect=[0, 0, 0.7, 1], h_pad=2)
+        # plt.tight_layout(rect=[0, 0, 0.7, 1], h_pad=2)
         plt.show()
 
-        return None
+        return {
+            'flux_dc_est': flux_est,
+            'flux_raw': flux_raw,
+            'r_binedges': r_binedges,
+            't_binedges': t_binedges,
+            'deadtime_trim_idx': deadtime_trim_idx,
+            'rbin_num_trim': rbin_num_trim
+        }
+
+    def plot_binwise_corrections(self, mueller_results, dc_results):
+        r_binedges_m = mueller_results['r_binedges']  # [m]
+        t_binedges_m = mueller_results['t_binedges']  # [s]
+        flux_m = mueller_results['flux_mueller']  # [Hz]
+
+        r_binedges_dc = dc_results['r_binedges']  # [m]
+        t_binedges_dc = dc_results['t_binedges']  # [s]
+        deadtime_trim_idx = dc_results['deadtime_trim_idx']
+        rbin_num_trim = dc_results['rbin_num_trim']
+        flux_dc = dc_results['flux_dc_est']  # [Hz]
+        flux_raw = dc_results['flux_raw']  # [Hz]
+
+        flux_m = flux_m[deadtime_trim_idx:rbin_num_trim]  # [Hz]
+        r_binedges_m = r_binedges_m[deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+
+        vmin = np.nanmin(flux_raw[flux_raw > 0]) / 1e6
+        vmax = max(np.nanmax(flux_dc), np.nanmax(flux_m)) / 1e6
+
+        fig = plt.figure(dpi=400,
+                         figsize=(10, 5),
+                         constrained_layout=True
+                         )
+        ax1 = fig.add_subplot(131)
+        ax2 = fig.add_subplot(132)
+        ax3 = fig.add_subplot(133)
+        mesh1 = ax1.pcolormesh(t_binedges_dc,
+                               r_binedges_dc / 1e3,
+                               flux_raw / 1e6,
+                               cmap='viridis',
+                               norm=LogNorm(vmin=vmin,
+                                            vmax=vmax
+                                            )
+                               )
+        mesh2 = ax2.pcolormesh(t_binedges_dc,
+                               r_binedges_dc / 1e3,
+                               flux_dc / 1e6,
+                               cmap='viridis',
+                               norm=LogNorm(vmin=vmin,
+                                            vmax=vmax
+                                            )
+                               )
+        mesh3 = ax3.pcolormesh(t_binedges_m,
+                               r_binedges_m / 1e3,
+                               flux_m / 1e6,
+                               cmap='viridis',
+                               norm=LogNorm(vmin=vmin,
+                                            vmax=vmax
+                                            )
+                               )
+        ax1.set_xlabel('Time [s]')
+        ax1.set_ylabel('Range [km]')
+        ax1.set_title('Raw')
+        ax2.set_xlabel('Time [s]')
+        ax2.set_title('Deadtime Model')
+        ax2.tick_params(labelleft=False)
+        ax3.set_xlabel('Time [s]')
+        ax3.set_title('Mueller')
+        ax3.tick_params(labelleft=False)
+        cbar = fig.colorbar(mesh3, ax=[ax1, ax2, ax3], location='right', pad=0.15)
+        cbar.set_label('Flux [MHz]')
+        [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
+        plt.show()
+
+
+
+        quit()
+
 
 
 class DataPlotter:
     def __init__(self, config):
         self.flux_bg_sub = False
+        self.cbar_min = None
+        self.cbar_max = None
 
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
@@ -451,7 +568,7 @@ class DataPlotter:
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
-        ax.set_aspect('equal')
+        # ax.set_aspect('equal')
         ax.set_title(
             'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))
         plt.tight_layout()
@@ -493,7 +610,7 @@ class DataLoader:
         self.time_delay_correct = config['process_params']['time_delay_correct']
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
-        self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
+        # self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
         self.active_fraction = config['process_params']['active_fraction']
 
         # File params
