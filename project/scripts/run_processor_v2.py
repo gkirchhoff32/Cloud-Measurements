@@ -10,7 +10,7 @@ and laser shots. Plot the data in scatter or histogram format.
 import yaml
 from pathlib import Path
 
-from processing.data_preprocessor_v2 import DataProcessor
+from processing.data_preprocessor_v2 import DataPreprocessor
 
 def main():
     """
@@ -20,7 +20,7 @@ def main():
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    dp = DataProcessor(config)
+    dp = DataPreprocessor(config)
     dp.run()
 
 

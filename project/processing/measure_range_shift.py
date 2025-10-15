@@ -11,12 +11,11 @@ Grant Kirchhoff grant.kirchhoff@colorado.edu
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 import yaml
 from pathlib import Path
 import matplotlib.gridspec as gridspec
 
-from data_preprocessor import DataPreprocessor
+from archived.data_preprocessor import DataPreprocessor
 
 def gen_histogram(dp):
     """

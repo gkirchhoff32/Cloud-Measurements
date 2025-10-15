@@ -16,7 +16,7 @@ Grant Kirchhoff grant.kirchhoff@colorado.edu
 import yaml
 from pathlib import Path
 
-from data_preprocessor import DataPreprocessor
+from archived.data_preprocessor import DataPreprocessor
 
 config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
 with open(config_path) as f:
