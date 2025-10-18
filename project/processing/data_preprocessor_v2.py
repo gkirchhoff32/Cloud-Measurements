@@ -4,7 +4,6 @@ from processing.processing_methods.data_loader import DataLoader
 from processing.processing_methods.data_plotter import DataPlotter
 from processing.processing_methods.deadtime_correct import DeadtimeCorrect
 
-# TODO: Deadtime-correct low-gain channel and calculate high-low ratio. Check mismatch in rbins both channels
 # TODO: Take fft of raw and deadtime-corrected signals to quantify how much deadtime-periodic fluctuations are suppressed
 
 
@@ -30,7 +29,8 @@ class DataPreprocessor:
             deadtime_bg_results_hg = self.deadtime_correct.deadtime_bg_calc(self.loader, self.plotter)
 
             # Compare corrections
-            self.deadtime_correct.plot_binwise_corrections(mueller_results_hg, dc_results_hg, deadtime_bg_results_hg)
+            fluxes_bg_sub_hg = self.deadtime_correct.plot_binwise_corrections(mueller_results_hg, dc_results_hg, deadtime_bg_results_hg)
+
 
             self.loader = DataLoader(self.config)
             self.loader.fname = r'/Dev_1_-_2025-09-13_22.36.08.ARSENL'
@@ -46,7 +46,11 @@ class DataPreprocessor:
             deadtime_bg_results_lg = self.deadtime_correct.deadtime_bg_calc(self.loader, self.plotter)
 
             # Compare corrections
-            self.deadtime_correct.plot_binwise_corrections(mueller_results_lg, dc_results_lg, deadtime_bg_results_lg)
+            fluxes_bg_sub_lg = self.deadtime_correct.plot_binwise_corrections(mueller_results_lg, dc_results_lg, deadtime_bg_results_lg)
+
+            # Load both channels now
+            self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg)
+
 
             quit()
         else:

@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import RectangleSelector
 
-# TODO: 'deadtime_model_correct' Sometimes flux_raw / af_hist can't complete due to 1 range bin mismatch. Investigate.
+# TODO: 'deadtime_model_correct' At high range resolution, flux_raw / af_hist can't complete due to 1 range bin mismatch. Investigate.
 
 
 class DeadtimeCorrect:
     def __init__(self, config):
         self.deadtime = None
+        self.deadtime_trim_idx = None
         self.af_bg = False
         self.rbinsize_bg_est = 50  # [m]
         self.tbinsize_bg_est = 10  # [s]
@@ -32,6 +33,146 @@ class DeadtimeCorrect:
         # Plot params
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
+
+    def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg):
+        deadtime_trim_idx_hg = fluxes_bg_sub_hg['deadtime_trim_idx']
+        deadtime_trim_idx_lg = fluxes_bg_sub_lg['deadtime_trim_idx']
+        residual_idx = deadtime_trim_idx_lg - deadtime_trim_idx_hg
+
+        flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub'][residual_idx:]  # [Hz]
+        flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub'][residual_idx:]  # [Hz]
+        flux_dc_bg_sub_hg = fluxes_bg_sub_hg['flux_dc_bg_sub'][residual_idx:]  # [Hz]
+        r_binedges_m_hg = fluxes_bg_sub_hg['r_binedges_m'][residual_idx:]  # [m]
+        r_binedges_dc_hg = fluxes_bg_sub_hg['r_binedges_dc'][residual_idx:]  # [m]
+        t_binedges_m_hg = fluxes_bg_sub_hg['t_binedges_m']  # [s]
+        t_binedges_dc_hg = fluxes_bg_sub_hg['t_binedges_dc']  # [s]
+
+        flux_bg_sub_lg = fluxes_bg_sub_lg['flux_bg_sub']  # [Hz]
+        flux_m_bg_sub_lg = fluxes_bg_sub_lg['flux_m_bg_sub']  # [Hz]
+        flux_dc_bg_sub_lg = fluxes_bg_sub_lg['flux_dc_bg_sub']  # [Hz]
+        # r_binedges_m_lg = fluxes_bg_sub_lg['r_binedges_m']  # [m]
+        # t_binedges_m_lg = fluxes_bg_sub_lg['t_binedges_m']  # [s]
+        # r_binedges_dc_lg = fluxes_bg_sub_lg['r_binedges_dc']  # [m]
+        # t_binedges_dc_lg = fluxes_bg_sub_lg['t_binedges_dc']  # [s]
+
+        diff_olap_flux = flux_bg_sub_hg / flux_bg_sub_lg
+        diff_olap_flux_m = flux_m_bg_sub_hg / flux_m_bg_sub_lg
+        diff_olap_flux_dc = flux_dc_bg_sub_hg / flux_dc_bg_sub_lg
+
+        diff_olap_flux_masked = np.ma.masked_where((diff_olap_flux < 0), diff_olap_flux)
+        diff_olap_flux_m_masked = np.ma.masked_where((diff_olap_flux_m < 0), diff_olap_flux_m)
+        diff_olap_flux_dc_masked = np.ma.masked_where((diff_olap_flux_dc < 0), diff_olap_flux_dc)
+
+        all_diff_olap_vals = np.ma.concatenate([diff_olap_flux_masked,
+                                                diff_olap_flux_m_masked,
+                                                diff_olap_flux_dc_masked]).compressed()
+        vmin = np.nanmin(all_diff_olap_vals)
+        # vmax = np.nanmax(all_diff_olap_vals)
+        vmax = 600
+
+        if diff_olap_flux.shape[1] == 1:
+            rbinsize = r_binedges_dc_hg[1] - r_binedges_dc_hg[0]  # [m]
+            r_centers = r_binedges_dc_hg[:-1] + (rbinsize / 2)  # [m]
+            fig = plt.figure(dpi=400,
+                             figsize=(10, 5))
+            ax = fig.add_subplot(111)
+            ax.plot(r_centers / 1e3, diff_olap_flux_masked, label='No Correction')
+            ax.plot(r_centers / 1e3, diff_olap_flux_m_masked, label='Mueller')
+            ax.plot(r_centers / 1e3, diff_olap_flux_dc_masked, label='Deadtime Model')
+            ax.set_xlabel('Range [km]')
+            ax.set_ylabel('Differential Overlap (HG/LG)')
+            ax.set_yscale('log')
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+
+        fig = plt.figure(dpi=400,
+                         figsize=(10, 5),
+                         constrained_layout=True
+                         )
+        ax1 = fig.add_subplot(131)
+        ax2 = fig.add_subplot(132)
+        ax3 = fig.add_subplot(133)
+        mesh1 = ax1.pcolormesh(t_binedges_dc_hg,
+                               r_binedges_dc_hg / 1e3,
+                               diff_olap_flux_masked,
+                               cmap='viridis'
+                               )
+        __ = ax2.pcolormesh(t_binedges_m_hg,
+                            r_binedges_m_hg / 1e3,
+                            diff_olap_flux_m_masked,
+                            cmap='viridis'
+                            )
+        mesh3 = ax3.pcolormesh(t_binedges_dc_hg,
+                               r_binedges_dc_hg / 1e3,
+                               diff_olap_flux_dc_masked,
+                               cmap='viridis'
+                               )
+        ax1.set_xlabel('Time [s]')
+        ax1.set_ylabel('Range [km]')
+        ax1.set_title('Raw')
+        ax2.set_xlabel('Time [s]')
+        ax2.set_title('Mueller')
+        ax2.tick_params(labelleft=False)
+        ax3.set_xlabel('Time [s]')
+        ax3.set_title('Deadtime Model')
+        ax3.tick_params(labelleft=False)
+        cbar = fig.colorbar(mesh3, ax=[ax1, ax2, ax3],
+                            location='right',
+                            pad=0.15)
+        cbar.set_label('Differential Overlap (HG/LG)')
+        [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
+        plt.show()
+
+        fig = plt.figure(dpi=400,
+                         figsize=(10, 5),
+                         constrained_layout=True
+                         )
+        ax1 = fig.add_subplot(131)
+        ax2 = fig.add_subplot(132)
+        ax3 = fig.add_subplot(133)
+        mesh1 = ax1.pcolormesh(t_binedges_dc_hg,
+                               r_binedges_dc_hg / 1e3,
+                               diff_olap_flux_masked,
+                               cmap='viridis',
+                               norm=LogNorm(vmin=vmin,
+                                            vmax=vmax
+                                            )
+                               )
+        __ = ax2.pcolormesh(t_binedges_m_hg,
+                            r_binedges_m_hg / 1e3,
+                            diff_olap_flux_m_masked,
+                            cmap='viridis',
+                            norm=LogNorm(vmin=vmin,
+                                         vmax=vmax
+                                         )
+                            )
+        mesh3 = ax3.pcolormesh(t_binedges_dc_hg,
+                               r_binedges_dc_hg / 1e3,
+                               diff_olap_flux_dc_masked,
+                               cmap='viridis',
+                               norm=LogNorm(vmin=vmin,
+                                            vmax=vmax
+                                            )
+                               )
+        ax1.set_xlabel('Time [s]')
+        ax1.set_ylabel('Range [km]')
+        ax1.set_title('Raw')
+        ax2.set_xlabel('Time [s]')
+        ax2.set_title('Mueller')
+        ax2.tick_params(labelleft=False)
+        ax3.set_xlabel('Time [s]')
+        ax3.set_title('Deadtime Model')
+        ax3.tick_params(labelleft=False)
+        cbar = fig.colorbar(mesh3, ax=[ax1, ax2, ax3],
+                            location='right',
+                            pad=0.15)
+        cbar.set_label('Differential Overlap (HG/LG)')
+        [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
+        plt.show()
+
+
+        quit()
 
     def deadtime_bg_calc(self, loader, plotter):
         """
@@ -269,8 +410,8 @@ class DeadtimeCorrect:
             af_hist[:, i] = af_reshaped.mean(axis=1)
 
         # Normalize AF histogram
-        deadtime_trim_idx = round(deadtime_nbins / af_rbins_per_hist_bin)
-        af_hist = af_hist[deadtime_trim_idx:, :] / shots_per_hist_bin
+        self.deadtime_trim_idx = round(deadtime_nbins / af_rbins_per_hist_bin)
+        af_hist = af_hist[self.deadtime_trim_idx:, :] / shots_per_hist_bin
 
         print('Elapsed time: {} s'.format(time.time() - start_time))
 
@@ -297,8 +438,7 @@ class DeadtimeCorrect:
 
         return {
             'af_hist': af_hist,
-            'rbin_num_trim': rbin_num_trim,
-            'deadtime_trim_idx': deadtime_trim_idx
+            'rbin_num_trim': rbin_num_trim
         }
 
     def plot_bg_est(self, flux, t_binedges, r_binedges, loader):
@@ -339,8 +479,7 @@ class DeadtimeCorrect:
 
         return selected_region
 
-    @staticmethod
-    def deadtime_model_correct(af_results, histogram_results):
+    def deadtime_model_correct(self, af_results, histogram_results):
         """
         Apply deadtime-model correction by inverting flux and active-fraction histograms.
         """
@@ -351,10 +490,9 @@ class DeadtimeCorrect:
 
         af_hist = af_results['af_hist']
         rbin_num_trim = af_results['rbin_num_trim']
-        deadtime_trim_idx = af_results['deadtime_trim_idx']
 
-        flux_raw = flux_raw[deadtime_trim_idx:rbin_num_trim]  # [Hz]
-        r_binedges = r_binedges[deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+        flux_raw = flux_raw[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
+        r_binedges = r_binedges[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
 
         flux_est = flux_raw / af_hist
 
@@ -380,12 +518,10 @@ class DeadtimeCorrect:
             'flux_raw': flux_raw,
             'r_binedges': r_binedges,
             't_binedges': t_binedges,
-            'deadtime_trim_idx': deadtime_trim_idx,
             'rbin_num_trim': rbin_num_trim
         }
 
-    @staticmethod
-    def plot_binwise_corrections(mueller_results, dc_results, deadtime_bg_results):
+    def plot_binwise_corrections(self, mueller_results, dc_results, deadtime_bg_results):
         """
         Plot raw data, Mueller, and deadtime-model corrections to compare.
         """
@@ -396,7 +532,6 @@ class DeadtimeCorrect:
 
         r_binedges_dc = dc_results['r_binedges']  # [m]
         t_binedges_dc = dc_results['t_binedges']  # [s]
-        deadtime_trim_idx = dc_results['deadtime_trim_idx']
         rbin_num_trim = dc_results['rbin_num_trim']
         flux_dc = dc_results['flux_dc_est']  # [Hz]
         flux_raw = dc_results['flux_raw']  # [Hz]
@@ -404,8 +539,8 @@ class DeadtimeCorrect:
         bg_flux_raw = deadtime_bg_results['bg_flux_raw']  # [Hz]
         bg_flux_mueller = deadtime_bg_results['bg_flux_mueller']  # [Hz]
 
-        flux_m = flux_m[deadtime_trim_idx:rbin_num_trim]  # [Hz]
-        r_binedges_m = r_binedges_m[deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+        flux_m = flux_m[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
+        r_binedges_m = r_binedges_m[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
 
         flux_raw -= bg_flux_raw  # [Hz]
         flux_m -= bg_flux_mueller  # [Hz]
@@ -429,17 +564,17 @@ class DeadtimeCorrect:
                                          vmax=vmax
                                          )
                             )
-        __ = ax2.pcolormesh(t_binedges_dc,
-                            r_binedges_dc / 1e3,
-                            flux_dc / 1e6,
+        __ = ax2.pcolormesh(t_binedges_m,
+                            r_binedges_m / 1e3,
+                            flux_m / 1e6,
                             cmap='viridis',
                             norm=LogNorm(vmin=vmin,
                                          vmax=vmax
                                          )
                             )
-        mesh3 = ax3.pcolormesh(t_binedges_m,
-                               r_binedges_m / 1e3,
-                               flux_m / 1e6,
+        mesh3 = ax3.pcolormesh(t_binedges_dc,
+                               r_binedges_dc / 1e3,
+                               flux_dc / 1e6,
                                cmap='viridis',
                                norm=LogNorm(vmin=vmin,
                                             vmax=vmax
@@ -449,10 +584,10 @@ class DeadtimeCorrect:
         ax1.set_ylabel('Range [km]')
         ax1.set_title('Raw')
         ax2.set_xlabel('Time [s]')
-        ax2.set_title('Deadtime Model')
+        ax2.set_title('Mueller')
         ax2.tick_params(labelleft=False)
         ax3.set_xlabel('Time [s]')
-        ax3.set_title('Mueller')
+        ax3.set_title('Deadtime Model')
         ax3.tick_params(labelleft=False)
         cbar = fig.colorbar(mesh3, ax=[ax1, ax2, ax3],
                             location='right',
@@ -460,6 +595,17 @@ class DeadtimeCorrect:
         cbar.set_label('Flux [MHz]')
         [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
         plt.show()
+
+        return {
+            'flux_bg_sub': flux_raw,
+            'flux_m_bg_sub': flux_m,
+            'flux_dc_bg_sub': flux_dc,
+            'r_binedges_m': r_binedges_m,
+            't_binedges_m': t_binedges_m,
+            'r_binedges_dc': r_binedges_dc,
+            't_binedges_dc': t_binedges_dc,
+            'deadtime_trim_idx': self.deadtime_trim_idx
+        }
 
     @staticmethod
     def selector_callback():
