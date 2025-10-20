@@ -35,9 +35,10 @@ class DeadtimeCorrect:
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg):
-        deadtime_trim_idx_hg = fluxes_bg_sub_hg['deadtime_trim_idx']
-        deadtime_trim_idx_lg = fluxes_bg_sub_lg['deadtime_trim_idx']
-        residual_idx = deadtime_trim_idx_lg - deadtime_trim_idx_hg
+        # deadtime_trim_idx_hg = fluxes_bg_sub_hg['deadtime_trim_idx']
+        # deadtime_trim_idx_lg = fluxes_bg_sub_lg['deadtime_trim_idx']
+        # residual_idx = deadtime_trim_idx_lg - deadtime_trim_idx_hg
+        residual_idx = 1
 
         flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub'][residual_idx:]  # [Hz]
         flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub'][residual_idx:]  # [Hz]
@@ -346,7 +347,7 @@ class DeadtimeCorrect:
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg  # [s]
 
         # Create fine-res range array
-        rvals_af = np.arange(min_range_dtime, max_range, dr_af)  # [m]
+        rvals_af = np.arange(min_range_dtime + (dr_af / 2), max_range, dr_af)  # [m]
         n_rbins_af = len(rvals_af)
 
         # Number of fine-res bins per coarse (histogram) bin
