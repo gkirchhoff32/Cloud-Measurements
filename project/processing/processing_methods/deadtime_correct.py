@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import RectangleSelector
 
-# TODO: 'deadtime_model_correct' At high range resolution, flux_raw / af_hist can't complete due to 1 range bin mismatch. Investigate.
+# TODO: create non-fractional binning mode in addition to fractional binning
 
 
 class DeadtimeCorrect:
@@ -13,7 +13,7 @@ class DeadtimeCorrect:
         self.deadtime_trim_idx = None
         self.af_bg = False
         self.rbinsize_bg_est = 50  # [m]
-        self.tbinsize_bg_est = 10  # [s]
+        self.tbinsize_bg_est = 5  # [s]
 
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
@@ -35,9 +35,6 @@ class DeadtimeCorrect:
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg):
-        # deadtime_trim_idx_hg = fluxes_bg_sub_hg['deadtime_trim_idx']
-        # deadtime_trim_idx_lg = fluxes_bg_sub_lg['deadtime_trim_idx']
-        # residual_idx = deadtime_trim_idx_lg - deadtime_trim_idx_hg
         residual_idx = 1
 
         flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub'][residual_idx:]  # [Hz]
@@ -172,7 +169,6 @@ class DeadtimeCorrect:
         [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
         plt.show()
 
-
         quit()
 
     def deadtime_bg_calc(self, loader, plotter):
@@ -189,7 +185,7 @@ class DeadtimeCorrect:
         loader.load_xlim, loader.load_ylim = True, False
         plotter.plot_xlim, plotter.plot_ylim = False, False
         loader.tbinsize, loader.rbinsize = self.tbinsize_bg_est, self.rbinsize_bg_est  # [s], [m] Large bin sizes
-        loader.xlim = [loader.xlim[0] - (loader.tbinsize * 5), loader.xlim[1] + (loader.tbinsize * 5)]  # [s]
+        loader.xlim = [max(0, loader.xlim[0] - (loader.tbinsize * 5)), loader.xlim[1] + (loader.tbinsize * 5)]  # [s]
         loader.gen_hist_bg = True
 
         # Load histogram that includes background signal
@@ -332,7 +328,7 @@ class DeadtimeCorrect:
         start_time = time.time()
 
         # Load relevant chunks
-        loader.load_chunk()
+        # loader.load_chunk()
         dr_hist = loader.rbinsize  # [m] histogram range resolution
         dt_hist = loader.tbinsize  # [s] histogram time resolution
 

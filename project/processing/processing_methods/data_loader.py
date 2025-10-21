@@ -367,27 +367,80 @@ class DataLoader:
         netCDF file chunks. To load these variables, it's important to load chunks and store values as class properties
         for future handling.
         """
+        tmin = self.xlim[0]
+        tmax = self.xlim[1]
 
-        chunk = self.chunk_start
-        for i in range(self.chunk_num):
-            file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
-            # If file exists, load it.
-            if glob.glob(file_path):
-                print(f'\nPreprocessed file found: chunk #{chunk}')
-                ds = xr.open_dataset(file_path)
-                self.ranges_tot.append(ds['ranges'])
-                self.shots_time_tot.append(ds['shots_time'])
-                print('\nFile loaded.')
-                chunk += 1
-            # If file does not exist, either config settings for loading are wrong or ran out of chunks to load.
-            else:
-                print(f'\nPreprocessed file not found... check this')
-                if chunk == self.chunk_start:
-                    print('Starting chunk unavailable! Pick a different one.')
-                    quit()
+        # chunk = self.chunk_start
+        loaded = 0
+        covered_start = False
+        covered_end = False
+        files = sorted(glob.glob(os.path.join(self.preprocess_path, f'{self.generic_fname}_*.nc')))
+        print('Locating and loading relevant netcdf data chunks...')
+        for file_path in files:
+
+        # for i in range(self.chunk_num):
+        #     file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+
+            # Open metadata only (don't load full data)
+            with xr.open_dataset(file_path, decode_times=False) as ds:
+                # Get the filename
+                fname = os.path.basename(file_path)
+
+                # Extract the final number before .nc
+                match = re.search(r'_(\d+)\.nc$', fname)
+                if match:
+                    chunk = int(match.group(1))
+
+                # Get the first and last time values (assume shots_time is 1D and sorted)
+                t0 = ds['shots_time'].isel(shots_time=0).item()
+                t1 = ds['shots_time'].isel(shots_time=-1).item()
+
+                overlaps = (t1 >= tmin) and (t0 <= tmax)
+                # Check for overlap
+                if overlaps:
+                    print(f'\nIncluding chunk #{chunk}: {t0:.2f}–{t1:.2f}s overlaps {tmin:.2f}–{tmax:.2f}s')
+                    # Load the full dataset only now
+                    ds_full = xr.open_dataset(file_path)
+                    self.ranges_tot.append(ds_full['ranges'])
+                    self.shots_time_tot.append(ds_full['shots_time'])
+                    print('File loaded.')
+                    loaded += 1
+
+                    # Update coverage flags
+                    if t0 <= tmin:
+                        covered_start = True
+                    if t1 >= tmax:
+                        covered_end = True
+
+                    # Stop early if full range is covered
+                    if covered_start and covered_end:
+                        print(f'\n✅ Full time range {tmin:.2f}–{tmax:.2f}s covered by loaded chunks.')
+                        break
                 else:
-                    print('\nNo more chunks. Starting to plot...')
-                    break
+                    print(f'Skipping chunk #{chunk}: {t0:.2f}–{t1:.2f}s not in range {tmin:.2f}–{tmax:.2f}s')
+        print('Loaded {} files'.format(loaded))
+
+
+        # chunk = self.chunk_start
+        # for i in range(self.chunk_num):
+        #     file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
+        #     # If file exists, load it.
+        #     if glob.glob(file_path):
+        #         print(f'\nPreprocessed file found: chunk #{chunk}')
+        #         ds = xr.open_dataset(file_path)
+        #         self.ranges_tot.append(ds['ranges'])
+        #         self.shots_time_tot.append(ds['shots_time'])
+        #         print('\nFile loaded.')
+        #         chunk += 1
+        #     # If file does not exist, either config settings for loading are wrong or ran out of chunks to load.
+        #     else:
+        #         print(f'\nPreprocessed file not found... check this')
+        #         if chunk == self.chunk_start:
+        #             print('Starting chunk unavailable! Pick a different one.')
+        #             quit()
+        #         else:
+        #             print('\nNo more chunks. Starting to plot...')
+        #             break
 
     def parse_filename(self):
         """
