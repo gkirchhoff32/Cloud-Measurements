@@ -35,7 +35,7 @@ class DeadtimeCorrect:
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg, loader):
-        residual_idx = 1 if (loader.deadtime > loader.rbinsize) else 0
+        residual_idx = 1 if ((loader.deadtime * self.c / 2) > loader.rbinsize) else 0
 
         flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub'][residual_idx:]  # [Hz]
         flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub'][residual_idx:]  # [Hz]

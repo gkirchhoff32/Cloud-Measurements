@@ -39,8 +39,8 @@ plot_params:
   histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 0.5   # [s] temporal bin size
-  rbinsize: 5   # [m] range bin size
+  tbinsize: 5   # [s] temporal bin size
+  rbinsize: 10   # [m] range bin size
   ylim: [2, 2.06]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE

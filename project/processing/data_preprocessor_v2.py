@@ -5,6 +5,7 @@ from processing.processing_methods.data_plotter import DataPlotter
 from processing.processing_methods.deadtime_correct import DeadtimeCorrect
 
 # TODO: Take fft of raw and deadtime-corrected signals to quantify how much deadtime-periodic fluctuations are suppressed
+# TODO: Look into less heterogeneous targets, such as smoke, rayleigh, or stratiform clouds
 
 
 class DataPreprocessor:
