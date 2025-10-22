@@ -18,6 +18,7 @@ class DataLoader:
         self.generic_fname = None
         self.fname_nc = None
         self.preprocess_path = None
+        self.deadtime = None
         self.gen_hist_bg = False
         self.ranges_tot = []
         self.shots_time_tot = []
@@ -42,6 +43,7 @@ class DataLoader:
         self.range_shift = config['process_params']['range_shift']
         # self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
         self.active_fraction = config['process_params']['active_fraction']
+        self.fractional_bin = config['process_params']['fractional_bin']
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
@@ -241,7 +243,7 @@ class DataLoader:
         ranges = np.concatenate([da.values.ravel() for da in self.ranges_tot])
         shots_time = np.concatenate([da.values.ravel() for da in self.shots_time_tot])
 
-        deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
+        self.deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
 
         # Set time and range windows
         if self.load_xlim:
@@ -249,7 +251,7 @@ class DataLoader:
         else:
             min_time, max_time = shots_time[0], shots_time[-1]  # [s]
         if self.load_ylim:
-            reduce_min = (deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
+            reduce_min = (self.deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
             # from preceding bins
             min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
         else:
@@ -263,8 +265,13 @@ class DataLoader:
             ranges = ranges[min_shots_idx:max_shots_idx]
 
         # Round to nearest integer factor for binning. This is for ease of AF calculation later.
-        # Use large bin size for background calculation. Else, use smallest bin size.
-        dr_af = self.rbinsize if self.gen_hist_bg else self.pulse_width * self.c / 2  # [m]
+        # Use large bin size for background calculation. Else, use pulse width for fractional binning or histogram range
+        # bin for integer binning
+        smallest_rbinsize = (self.pulse_width * self.c / 2) if self.fractional_bin else self.rbinsize  # [m]
+        if smallest_rbinsize > (self.deadtime / self.c * 2) and not self.fractional_bin:
+            input('AF calculation bin size is larger than the deadtime interval. Will likely create rounding issues.'
+                  'Are you sure you want to proceed? Press any key to continue...')
+        dr_af = self.rbinsize if self.gen_hist_bg else smallest_rbinsize  # [m]
         dt_af = 1 / self.PRF  # [s]
 
         # Round range and time histogram bin size that factorizes the fine-res bin size

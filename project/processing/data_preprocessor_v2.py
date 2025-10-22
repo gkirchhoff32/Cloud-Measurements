@@ -49,7 +49,7 @@ class DataPreprocessor:
             fluxes_bg_sub_lg = self.deadtime_correct.plot_binwise_corrections(mueller_results_lg, dc_results_lg, deadtime_bg_results_lg)
 
             # Load both channels now
-            self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg)
+            self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg, self.loader)
 
 
             quit()

@@ -34,8 +34,8 @@ class DeadtimeCorrect:
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
-    def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg):
-        residual_idx = 1
+    def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg, loader):
+        residual_idx = 1 if (loader.deadtime > loader.rbinsize) else 0
 
         flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub'][residual_idx:]  # [Hz]
         flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub'][residual_idx:]  # [Hz]
@@ -338,7 +338,7 @@ class DeadtimeCorrect:
         min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
 
         # Fine-resolution bin size used to calculate active-fraction (AF) fractional binning
-        dr_af = self.pulse_width * self.c / 2  # [m]
+        dr_af = (self.pulse_width * self.c / 2) if loader.fractional_bin else loader.rbinsize  # [m]
         dt_af = 1 / self.PRF  # [s]
         deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg  # [s]
 
@@ -349,7 +349,7 @@ class DeadtimeCorrect:
         # Number of fine-res bins per coarse (histogram) bin
         shots_per_hist_bin = round(dt_hist / dt_af)
         af_rbins_per_hist_bin = round(dr_hist / dr_af)
-        deadtime_nbins = np.ceil(deadtime / (dr_af / self.c * 2)).astype(int)  # fine-res bin number in deadtime
+        deadtime_nbins = np.floor(deadtime / (dr_af / self.c * 2)).astype(int)  # fine-res bin number in deadtime
 
         # Unpack time-tag ranges and shots
         ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])  # [m]
