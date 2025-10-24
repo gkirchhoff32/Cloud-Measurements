@@ -42,7 +42,7 @@ class DataPreprocessor:
             mueller_results_lg = self.deadtime_correct.mueller_correct(histogram_results_lg, self.loader)
 
             # Calculate deadtime-model correction
-            af_results_lg = self.deadtime_correct.calc_af_hist(histogram_results_lg, self.loader)
+            af_results_lg = self.deadtime_correct.calc_af_hist_manual(histogram_results_lg, self.loader)
             dc_results_lg = self.deadtime_correct.deadtime_model_correct(af_results_lg, histogram_results_lg)
             deadtime_bg_results_lg = self.deadtime_correct.deadtime_bg_calc(self.loader, self.plotter)
 

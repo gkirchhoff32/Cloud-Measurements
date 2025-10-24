@@ -34,6 +34,20 @@ class DeadtimeCorrect:
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
+    def calc_af_hist_convolution(self, histogram_results, loader):
+        """
+        Method to calculate active-fraction histogram using fractional binning.
+        """
+
+        start_time = time.time()
+
+        # Load bin edges. Remember, min_range_dtime is min_range minus one deadtime interval
+        hist_t_binedges = histogram_results['t_binedges']
+        hist_r_binedges = histogram_results['r_binedges']
+        min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
+        
+        # TODO: implement deadtime convolution method. check jupyter
+
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg, loader):
         residual_idx = 1 if ((loader.deadtime * self.c / 2) > loader.rbinsize) else 0
 
@@ -320,7 +334,7 @@ class DeadtimeCorrect:
         plt.tight_layout()
         plt.show()
 
-    def calc_af_hist(self, histogram_results, loader):
+    def calc_af_hist_manual(self, histogram_results, loader):
         """
         Method to calculate active-fraction histogram using fractional binning.
         """
