@@ -3,6 +3,7 @@ import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import RectangleSelector
+from scipy.signal import fftconvolve
 
 # TODO: create non-fractional binning mode in addition to fractional binning
 
@@ -44,24 +45,78 @@ class DeadtimeCorrect:
         # Load bin edges. Remember, min_range_dtime is min_range minus one deadtime interval
         hist_t_binedges = histogram_results['t_binedges']
         hist_r_binedges = histogram_results['r_binedges']
-        min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
-        
-        # TODO: implement deadtime convolution method. check jupyter
+        H = histogram_results['cnts_raw']
+        rbinsize = loader.rbinsize
+        tbinsize = loader.tbinsize
+        PRF = loader.PRF
+
+        # min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
+        nrbins = len(hist_r_binedges[:-1])
+
+        K = np.floor((loader.deadtime * self.c / 2) / rbinsize).astype(int)  # number of bins (floor round) that occupy deadtime
+        dtime_kern = np.ones(K)
+        remainder = (loader.deadtime * self.c / 2) % rbinsize
+        dtime_kern = np.append(dtime_kern, remainder)
+
+        N = tbinsize * PRF  # number of shots per time bin
+        d = fftconvolve(H, dtime_kern[:, None], mode='full') / N
+        d = d[:nrbins, :]
+        a = 1 - d
+
+        # Normalize AF histogram
+        af_hist = a[K:, :]
+        self.deadtime_trim_idx = K
+
+        print('Elapsed time: {} s'.format(time.time() - start_time))
+
+        # Plot AF histogram
+        if not self.af_bg:
+            extent_t0, extent_t1 = (hist_t_binedges[0] - (tbinsize / 2)), \
+                                   (hist_t_binedges[-1] + (tbinsize / 2))  # [s]
+            extent_r0, extent_r1 = (hist_r_binedges[K] / 1e3), \
+                                   (hist_r_binedges[-1] / 1e3)  # [m]
+            fig = plt.figure(figsize=(8, 4),
+                             dpi=400
+                             )
+            ax = fig.add_subplot(111)
+            im = ax.imshow(af_hist,
+                           aspect='auto',
+                           origin='lower',
+                           cmap='viridis',
+                           extent=[extent_t0,
+                                   extent_t1,
+                                   extent_r0,
+                                   extent_r1
+                                   ]
+                           )
+            cbar = fig.colorbar(im,
+                                ax=ax
+                                )
+            cbar.set_label('AF Value')
+            ax.set_xlabel('Time [s]')
+            ax.set_ylabel('Range [km]')
+            plt.show()
+
+        return {
+            'af_hist': af_hist
+        }
+
 
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg, loader):
-        residual_idx = 1 if ((loader.deadtime * self.c / 2) > loader.rbinsize) else 0
+        # residual_idx = 1 if ((loader.deadtime * self.c / 2) > loader.rbinsize) else 0
+        residual_idx = 0
 
-        flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub'][residual_idx:]  # [Hz]
-        flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub'][residual_idx:]  # [Hz]
-        flux_dc_bg_sub_hg = fluxes_bg_sub_hg['flux_dc_bg_sub'][residual_idx:]  # [Hz]
-        r_binedges_m_hg = fluxes_bg_sub_hg['r_binedges_m'][residual_idx:]  # [m]
-        r_binedges_dc_hg = fluxes_bg_sub_hg['r_binedges_dc'][residual_idx:]  # [m]
+        flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub']  # [Hz]
+        flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub']  # [Hz]
+        flux_dc_bg_sub_hg = fluxes_bg_sub_hg['flux_dc_bg_sub']  # [Hz]
+        r_binedges_m_hg = fluxes_bg_sub_hg['r_binedges_m']  # [m]
+        r_binedges_dc_hg = fluxes_bg_sub_hg['r_binedges_dc']  # [m]
         t_binedges_m_hg = fluxes_bg_sub_hg['t_binedges_m']  # [s]
         t_binedges_dc_hg = fluxes_bg_sub_hg['t_binedges_dc']  # [s]
 
-        flux_bg_sub_lg = fluxes_bg_sub_lg['flux_bg_sub']  # [Hz]
-        flux_m_bg_sub_lg = fluxes_bg_sub_lg['flux_m_bg_sub']  # [Hz]
-        flux_dc_bg_sub_lg = fluxes_bg_sub_lg['flux_dc_bg_sub']  # [Hz]
+        flux_bg_sub_lg = fluxes_bg_sub_lg['flux_bg_sub'][residual_idx:]  # [Hz]
+        flux_m_bg_sub_lg = fluxes_bg_sub_lg['flux_m_bg_sub'][residual_idx:]  # [Hz]
+        flux_dc_bg_sub_lg = fluxes_bg_sub_lg['flux_dc_bg_sub'][residual_idx:]  # [Hz]
         # r_binedges_m_lg = fluxes_bg_sub_lg['r_binedges_m']  # [m]
         # t_binedges_m_lg = fluxes_bg_sub_lg['t_binedges_m']  # [s]
         # r_binedges_dc_lg = fluxes_bg_sub_lg['r_binedges_dc']  # [m]
@@ -491,6 +546,8 @@ class DeadtimeCorrect:
         return selected_region
 
     def deadtime_model_correct(self, af_results, histogram_results):
+        # TODO: Figure out mismatch (by one range bin) between lg and hg outputs
+
         """
         Apply deadtime-model correction by inverting flux and active-fraction histograms.
         """
@@ -500,10 +557,12 @@ class DeadtimeCorrect:
         flux_raw = histogram_results['flux_raw']  # [Hz]
 
         af_hist = af_results['af_hist']
-        rbin_num_trim = af_results['rbin_num_trim']
+        # rbin_num_trim = af_results['rbin_num_trim']
 
-        flux_raw = flux_raw[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
-        r_binedges = r_binedges[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+        # flux_raw = flux_raw[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
+        # r_binedges = r_binedges[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+        flux_raw = flux_raw[self.deadtime_trim_idx:]  # [Hz]
+        r_binedges = r_binedges[self.deadtime_trim_idx:]  # [m]
 
         flux_est = flux_raw / af_hist
 
@@ -528,8 +587,7 @@ class DeadtimeCorrect:
             'flux_dc_est': flux_est,
             'flux_raw': flux_raw,
             'r_binedges': r_binedges,
-            't_binedges': t_binedges,
-            'rbin_num_trim': rbin_num_trim
+            't_binedges': t_binedges
         }
 
     def plot_binwise_corrections(self, mueller_results, dc_results, deadtime_bg_results):
@@ -543,15 +601,17 @@ class DeadtimeCorrect:
 
         r_binedges_dc = dc_results['r_binedges']  # [m]
         t_binedges_dc = dc_results['t_binedges']  # [s]
-        rbin_num_trim = dc_results['rbin_num_trim']
+        # rbin_num_trim = dc_results['rbin_num_trim']
         flux_dc = dc_results['flux_dc_est']  # [Hz]
         flux_raw = dc_results['flux_raw']  # [Hz]
 
         bg_flux_raw = deadtime_bg_results['bg_flux_raw']  # [Hz]
         bg_flux_mueller = deadtime_bg_results['bg_flux_mueller']  # [Hz]
 
-        flux_m = flux_m[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
-        r_binedges_m = r_binedges_m[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+        # flux_m = flux_m[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
+        # r_binedges_m = r_binedges_m[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
+        flux_m = flux_m[self.deadtime_trim_idx:]  # [Hz]
+        r_binedges_m = r_binedges_m[self.deadtime_trim_idx:]  # [m]
 
         flux_raw -= bg_flux_raw  # [Hz]
         flux_m -= bg_flux_mueller  # [Hz]
