@@ -46,7 +46,7 @@ class DataPlotter:
         """
         # Processed data
         flux_raw = histogram_results['flux_raw']
-        flux_bg_sub = histogram_results['flux_bg_sub']
+        # flux_bg_sub = histogram_results['flux_bg_sub']
         t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
         r_binedges = histogram_results['r_binedges']  # [m] range bin edges
 
@@ -80,7 +80,10 @@ class DataPlotter:
             fig.suptitle('CoBaLT Backscatter Flux')
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Flux [Hz]')
-        ax.set_xlabel('Time [s]')
+        ax.set_xlabel('Time since {}:{}:{} LT [s]'.format(loader.timestamp.hour,
+                                                          loader.timestamp.minute,
+                                                          loader.timestamp.second)
+                      )
         ax.set_ylabel('Range [km]')
         ax.set_title('Scale {:.1f} m x {:.2f} s\n{} {}'.format(self.rbinsize, self.tbinsize,
                                                                "Low Gain" if loader.low_gain else "High Gain",

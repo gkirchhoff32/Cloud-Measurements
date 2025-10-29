@@ -34,9 +34,8 @@ class DataPreprocessor:
             # Compare corrections
             fluxes_bg_sub_hg = self.deadtime_correct.plot_binwise_corrections(mueller_results_hg, dc_results_hg, deadtime_bg_results_hg)
 
-
             self.loader = DataLoader(self.config)
-            self.loader.fname = r'/Dev_1_-_2025-09-13_22.36.08.ARSENL'
+            self.loader.fname = r'/Dev_1_-_2025-10-08_22.26.35.ARSENL'
             self.loader.preprocess()
             histogram_results_lg = self.loader.gen_histogram()
 

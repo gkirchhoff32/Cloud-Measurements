@@ -53,9 +53,15 @@ class DeadtimeCorrect:
         # min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
         nrbins = len(hist_r_binedges[:-1])
 
-        K = np.floor((loader.deadtime * self.c / 2) / rbinsize).astype(int)  # number of bins (floor round) that occupy deadtime
+        deadtime_range = loader.deadtime * self.c / 2
+        K = np.floor(deadtime_range / rbinsize).astype(int)  # number of bins (floor round) that occupy deadtime
         dtime_kern = np.ones(K)
-        remainder = (loader.deadtime * self.c / 2) % rbinsize
+        # Handle remainder. If deadtime is longer than binsize, then tack on fractional bin.
+        # If deadtime is shorter, then only include single fractional bin.
+        if deadtime_range > rbinsize:
+            remainder = deadtime_range % rbinsize
+        else:
+            remainder = deadtime_range / rbinsize
         dtime_kern = np.append(dtime_kern, remainder)
 
         N = tbinsize * PRF  # number of shots per time bin
