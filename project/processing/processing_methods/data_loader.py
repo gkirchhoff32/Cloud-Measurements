@@ -245,25 +245,6 @@ class DataLoader:
 
         self.deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
 
-        # Set time and range windows
-        if self.load_xlim:
-            min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
-        else:
-            min_time, max_time = shots_time[0], shots_time[-1]  # [s]
-        if self.load_ylim:
-            reduce_min = (self.deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
-            # from preceding bins
-            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
-        else:
-            reduce_min = None
-            min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
-
-        if self.load_xlim:
-            max_shots_idx = np.argmin(np.abs(shots_time - max_time))
-            min_shots_idx = np.argmin(np.abs(shots_time - min_time))
-            shots_time = shots_time[min_shots_idx:max_shots_idx]
-            ranges = ranges[min_shots_idx:max_shots_idx]
-
         # Round to nearest integer factor for binning. This is for ease of AF calculation later.
         # Use large bin size for background calculation. Else, use pulse width for fractional binning or histogram range
         # bin for integer binning
@@ -279,6 +260,26 @@ class DataLoader:
         t_factor = max(1, round(self.tbinsize / dt_af))
         rbinsize_close = r_factor * dr_af  # [m]
         tbinsize_close = t_factor * dt_af  # [s]
+
+        # Set time and range windows
+        if self.load_xlim:
+            min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
+        else:
+            min_time, max_time = shots_time[0], shots_time[-1]  # [s]
+        if self.load_ylim:
+            reduce_min = (self.deadtime * self.c / 2) if self.active_fraction and (self.deadtime >= rbinsize_close) else 0
+            # reduce_min = (self.deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
+            # from preceding bins
+            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
+        else:
+            reduce_min = 0
+            min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
+
+        if self.load_xlim:
+            max_shots_idx = np.argmin(np.abs(shots_time - max_time))
+            min_shots_idx = np.argmin(np.abs(shots_time - min_time))
+            shots_time = shots_time[min_shots_idx:max_shots_idx]
+            ranges = ranges[min_shots_idx:max_shots_idx]
 
         if self.gen_hist_bg:
             print('Using approximate resolutions for background estimate: {:.3e} m x {:.3e} s.'.format(rbinsize_close, tbinsize_close))

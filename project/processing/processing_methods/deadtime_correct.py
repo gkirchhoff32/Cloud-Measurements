@@ -147,14 +147,16 @@ class DeadtimeCorrect:
             rbinsize = r_binedges_dc_hg[1] - r_binedges_dc_hg[0]  # [m]
             r_centers = r_binedges_dc_hg[:-1] + (rbinsize / 2)  # [m]
             fig = plt.figure(dpi=400,
-                             figsize=(10, 5))
+                             figsize=(10, 5)
+                             )
             ax = fig.add_subplot(111)
-            ax.plot(r_centers / 1e3, diff_olap_flux_masked, label='No Correction')
-            ax.plot(r_centers / 1e3, diff_olap_flux_m_masked, label='Mueller')
-            ax.plot(r_centers / 1e3, diff_olap_flux_dc_masked, label='Deadtime Model')
-            ax.set_xlabel('Range [km]')
-            ax.set_ylabel('Differential Overlap (HG/LG)')
-            ax.set_yscale('log')
+            ax.plot(diff_olap_flux_masked, r_centers / 1e3, label='No Correction')
+            ax.plot(diff_olap_flux_m_masked, r_centers / 1e3, label='Mueller')
+            ax.plot(diff_olap_flux_dc_masked, r_centers / 1e3, label='Deadtime Model')
+            ax.set_ylabel('Range [km]')
+            ax.set_xlabel('Differential Overlap (HG/LG)')
+            ax.set_title('Differential Overlap')
+            ax.set_xscale('log')
             plt.legend()
             plt.tight_layout()
             plt.show()
@@ -259,8 +261,21 @@ class DeadtimeCorrect:
         # When estimating background, load entire vertical range while limiting time bounds. This balances load time.
         loader.load_xlim, loader.load_ylim = True, False
         plotter.plot_xlim, plotter.plot_ylim = False, False
-        loader.tbinsize, loader.rbinsize = self.tbinsize_bg_est, self.rbinsize_bg_est  # [s], [m] Large bin sizes
-        loader.xlim = [max(0, loader.xlim[0] - (loader.tbinsize * 5)), loader.xlim[1] + (loader.tbinsize * 5)]  # [s]
+
+        x0, x1 = loader.xlim
+        dt = loader.tbinsize
+        width = x1 - x0
+
+        if dt < 5:
+            loader.xlim = [max(0, x0 - dt * 3), x1 + dt * 3]
+            tbinsize_bg_est = (loader.xlim[1] - loader.xlim[0]) / 5
+        elif dt > 50:
+            mid = (x0 + x1) / 2
+            loader.xlim, tbinsize_bg_est = [mid - 25, mid + 25], 25
+        else:
+            tbinsize_bg_est = width / 5
+
+        loader.tbinsize, loader.rbinsize = tbinsize_bg_est, self.rbinsize_bg_est  # [s], [m] Large bin sizes
         loader.gen_hist_bg = True
 
         # Load histogram that includes background signal
@@ -579,12 +594,12 @@ class DeadtimeCorrect:
                              )
             ax = fig.add_subplot(111)
             rcenters = r_binedges[:-1] - (r_binedges[1] - r_binedges[0]) / 2  # [m]
-            ax.plot(rcenters / 1e3, flux_raw / 1e6, label='Measured Flux', alpha=0.75)
-            ax.plot(rcenters / 1e3, flux_est / 1e6, label='Corrected Flux', alpha=0.75)
-            ax.set_xlabel('Range [km]')
-            ax.set_ylabel('Flux [MHz]')
+            ax.plot(flux_raw / 1e6, rcenters / 1e3, label='Measured Flux', alpha=0.75)
+            ax.plot(flux_est / 1e6, rcenters / 1e3, label='Corrected Flux', alpha=0.75)
+            ax.set_ylabel('Range [km]')
+            ax.set_xlabel('Flux [MHz]')
             ax.set_title('Deadtime Corrected Flux (1D)')
-            ax.set_yscale('log')
+            ax.set_xscale('log')
             plt.legend()
             plt.tight_layout()
             plt.show()
