@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import RectangleSelector
 from scipy.signal import fftconvolve
+from scipy.optimize import least_squares
 
 # TODO: create non-fractional binning mode in addition to fractional binning
 
@@ -14,7 +15,6 @@ class DeadtimeCorrect:
         self.deadtime_trim_idx = None
         self.af_bg = False
         self.rbinsize_bg_est = 50  # [m]
-        self.tbinsize_bg_est = 5  # [s]
 
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
@@ -35,131 +35,56 @@ class DeadtimeCorrect:
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
 
-    def calc_af_hist_convolution(self, histogram_results, loader):
-        """
-        Method to calculate active-fraction histogram using fractional binning.
-        """
-
-        start_time = time.time()
-
-        # Load bin edges. Remember, min_range_dtime is min_range minus one deadtime interval
-        hist_t_binedges = histogram_results['t_binedges']
-        hist_r_binedges = histogram_results['r_binedges']
-        H = histogram_results['cnts_raw']
-        rbinsize = loader.rbinsize
-        tbinsize = loader.tbinsize
-        PRF = loader.PRF
-
-        # min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
-        nrbins = len(hist_r_binedges[:-1])
-
-        deadtime_range = loader.deadtime * self.c / 2
-        K = np.floor(deadtime_range / rbinsize).astype(int)  # number of bins (floor round) that occupy deadtime
-        dtime_kern = np.ones(K)
-        # Handle remainder. If deadtime is longer than binsize, then tack on fractional bin.
-        # If deadtime is shorter, then only include single fractional bin.
-        if deadtime_range > rbinsize:
-            remainder = deadtime_range % rbinsize
-        else:
-            remainder = deadtime_range / rbinsize
-        dtime_kern = np.append(dtime_kern, remainder)
-
-        N = tbinsize * PRF  # number of shots per time bin
-        d = fftconvolve(H, dtime_kern[:, None], mode='full') / N
-        d = d[:nrbins, :]
-        a = 1 - d
-
-        # Normalize AF histogram
-        af_hist = a[K:, :]
-        self.deadtime_trim_idx = K
-
-        print('Elapsed time: {} s'.format(time.time() - start_time))
-
-        # Plot AF histogram
-        if not self.af_bg:
-            extent_t0, extent_t1 = (hist_t_binedges[0] - (tbinsize / 2)), \
-                                   (hist_t_binedges[-1] + (tbinsize / 2))  # [s]
-            extent_r0, extent_r1 = (hist_r_binedges[K] / 1e3), \
-                                   (hist_r_binedges[-1] / 1e3)  # [m]
-            fig = plt.figure(figsize=(8, 4),
-                             dpi=400
-                             )
-            ax = fig.add_subplot(111)
-            im = ax.imshow(af_hist,
-                           aspect='auto',
-                           origin='lower',
-                           cmap='viridis',
-                           extent=[extent_t0,
-                                   extent_t1,
-                                   extent_r0,
-                                   extent_r1
-                                   ]
-                           )
-            cbar = fig.colorbar(im,
-                                ax=ax
-                                )
-            cbar.set_label('AF Value')
-            ax.set_xlabel('Time [s]')
-            ax.set_ylabel('Range [km]')
-            plt.show()
-
-        return {
-            'af_hist': af_hist
-        }
-
 
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg, loader):
-        # residual_idx = 1 if ((loader.deadtime * self.c / 2) > loader.rbinsize) else 0
-        residual_idx = 0
-
         flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub']  # [Hz]
         flux_m_bg_sub_hg = fluxes_bg_sub_hg['flux_m_bg_sub']  # [Hz]
         flux_dc_bg_sub_hg = fluxes_bg_sub_hg['flux_dc_bg_sub']  # [Hz]
-        r_binedges_m_hg = fluxes_bg_sub_hg['r_binedges_m']  # [m]
-        r_binedges_dc_hg = fluxes_bg_sub_hg['r_binedges_dc']  # [m]
-        t_binedges_m_hg = fluxes_bg_sub_hg['t_binedges_m']  # [s]
-        t_binedges_dc_hg = fluxes_bg_sub_hg['t_binedges_dc']  # [s]
+        r_binedges = fluxes_bg_sub_hg['r_binedges_dc']  # [m]
+        t_binedges = fluxes_bg_sub_hg['t_binedges_dc']  # [s]
 
-        flux_bg_sub_lg = fluxes_bg_sub_lg['flux_bg_sub'][residual_idx:]  # [Hz]
-        flux_m_bg_sub_lg = fluxes_bg_sub_lg['flux_m_bg_sub'][residual_idx:]  # [Hz]
-        flux_dc_bg_sub_lg = fluxes_bg_sub_lg['flux_dc_bg_sub'][residual_idx:]  # [Hz]
-        # r_binedges_m_lg = fluxes_bg_sub_lg['r_binedges_m']  # [m]
-        # t_binedges_m_lg = fluxes_bg_sub_lg['t_binedges_m']  # [s]
-        # r_binedges_dc_lg = fluxes_bg_sub_lg['r_binedges_dc']  # [m]
-        # t_binedges_dc_lg = fluxes_bg_sub_lg['t_binedges_dc']  # [s]
+        flux_bg_sub_lg = fluxes_bg_sub_lg['flux_bg_sub']  # [Hz]
+        flux_m_bg_sub_lg = fluxes_bg_sub_lg['flux_m_bg_sub']  # [Hz]
+        flux_dc_bg_sub_lg = fluxes_bg_sub_lg['flux_dc_bg_sub']  # [Hz]
 
-        diff_olap_flux = flux_bg_sub_hg / flux_bg_sub_lg
-        diff_olap_flux_m = flux_m_bg_sub_hg / flux_m_bg_sub_lg
-        diff_olap_flux_dc = flux_dc_bg_sub_hg / flux_dc_bg_sub_lg
+        d_olap = flux_bg_sub_hg / flux_bg_sub_lg
+        d_olap_m = flux_m_bg_sub_hg / flux_m_bg_sub_lg
+        d_olap_dc = flux_dc_bg_sub_hg / flux_dc_bg_sub_lg
 
-        diff_olap_flux_masked = np.ma.masked_where((diff_olap_flux < 0), diff_olap_flux)
-        diff_olap_flux_m_masked = np.ma.masked_where((diff_olap_flux_m < 0), diff_olap_flux_m)
-        diff_olap_flux_dc_masked = np.ma.masked_where((diff_olap_flux_dc < 0), diff_olap_flux_dc)
+        d_olap = np.ma.masked_where((d_olap < 0), d_olap)
+        d_olap_m = np.ma.masked_where((d_olap_m < 0), d_olap_m)
+        d_olap_dc = np.ma.masked_where((d_olap_dc < 0), d_olap_dc)
 
-        all_diff_olap_vals = np.ma.concatenate([diff_olap_flux_masked,
-                                                diff_olap_flux_m_masked,
-                                                diff_olap_flux_dc_masked]).compressed()
+        all_diff_olap_vals = np.ma.concatenate([d_olap,
+                                                d_olap_m,
+                                                d_olap_dc]).compressed()
         vmin = np.nanmin(all_diff_olap_vals)
-        # vmax = np.nanmax(all_diff_olap_vals)
-        vmax = 600
+        vmax = np.nanmax(all_diff_olap_vals)
+        # vmax = 600
 
-        if diff_olap_flux.shape[1] == 1:
-            rbinsize = r_binedges_dc_hg[1] - r_binedges_dc_hg[0]  # [m]
-            r_centers = r_binedges_dc_hg[:-1] + (rbinsize / 2)  # [m]
-            fig = plt.figure(dpi=400,
-                             figsize=(10, 5)
-                             )
-            ax = fig.add_subplot(111)
-            ax.plot(diff_olap_flux_masked, r_centers / 1e3, label='No Correction')
-            ax.plot(diff_olap_flux_m_masked, r_centers / 1e3, label='Mueller')
-            ax.plot(diff_olap_flux_dc_masked, r_centers / 1e3, label='Deadtime Model')
-            ax.set_ylabel('Range [km]')
-            ax.set_xlabel('Differential Overlap (HG/LG)')
-            ax.set_title('Differential Overlap')
-            ax.set_xscale('log')
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
+        rbinsize = r_binedges[1] - r_binedges[0]  # [m]
+        r_centers = r_binedges[:-1] + (rbinsize / 2)  # [m]
+        fig = plt.figure(dpi=400,
+                         figsize=(10, 5)
+                         )
+        ax = fig.add_subplot(111)
+        colors = ['C0', 'C1', 'C2']
+        for i in range(len(d_olap[0, :])):
+            ax.plot(d_olap[:, i], r_centers / 1e3, '-', color=colors[0], alpha=0.25)
+            ax.plot(d_olap_m[:, i], r_centers / 1e3, '-', color=colors[1], alpha=0.25)
+            ax.plot(d_olap_dc[:, i], r_centers / 1e3, '-', color=colors[2], alpha=0.25)
+        ax.set_ylabel('Range [km]')
+        ax.set_xlabel('Differential Overlap (HG/LG)')
+        ax.set_title('Differential Overlap')
+        ax.set_xscale('log')
+        handles = [
+            plt.Line2D([0], [0], color=colors[0], linestyle='-', label='No Correction'),
+            plt.Line2D([0], [0], color=colors[1], linestyle='-', label='Mueller'),
+            plt.Line2D([0], [0], color=colors[2], linestyle='-', label='Deadtime Model'),
+        ]
+        plt.legend(handles=handles)
+        plt.tight_layout()
+        plt.show()
 
         fig = plt.figure(dpi=400,
                          figsize=(10, 5),
@@ -168,23 +93,23 @@ class DeadtimeCorrect:
         ax1 = fig.add_subplot(131)
         ax2 = fig.add_subplot(132)
         ax3 = fig.add_subplot(133)
-        mesh1 = ax1.pcolormesh(t_binedges_dc_hg,
-                               r_binedges_dc_hg / 1e3,
-                               diff_olap_flux_masked,
+        __ = ax1.pcolormesh(t_binedges,
+                               r_binedges / 1e3,
+                               d_olap,
                                cmap='viridis',
                                vmin=vmin,
                                vmax=vmax
                                )
-        __ = ax2.pcolormesh(t_binedges_m_hg,
-                            r_binedges_m_hg / 1e3,
-                            diff_olap_flux_m_masked,
+        __ = ax2.pcolormesh(t_binedges,
+                            r_binedges / 1e3,
+                            d_olap_m,
                             cmap='viridis',
                             vmin=vmin,
                             vmax=vmax
                             )
-        mesh3 = ax3.pcolormesh(t_binedges_dc_hg,
-                               r_binedges_dc_hg / 1e3,
-                               diff_olap_flux_dc_masked,
+        mesh3 = ax3.pcolormesh(t_binedges,
+                               r_binedges / 1e3,
+                               d_olap_dc,
                                cmap='viridis',
                                vmin=vmin,
                                vmax=vmax
@@ -212,25 +137,25 @@ class DeadtimeCorrect:
         ax1 = fig.add_subplot(131)
         ax2 = fig.add_subplot(132)
         ax3 = fig.add_subplot(133)
-        mesh1 = ax1.pcolormesh(t_binedges_dc_hg,
-                               r_binedges_dc_hg / 1e3,
-                               diff_olap_flux_masked,
+        __ = ax1.pcolormesh(t_binedges,
+                               r_binedges / 1e3,
+                               d_olap,
                                cmap='viridis',
                                norm=LogNorm(vmin=vmin,
                                             vmax=vmax
                                             )
                                )
-        __ = ax2.pcolormesh(t_binedges_m_hg,
-                            r_binedges_m_hg / 1e3,
-                            diff_olap_flux_m_masked,
+        __ = ax2.pcolormesh(t_binedges,
+                            r_binedges / 1e3,
+                            d_olap_m,
                             cmap='viridis',
                             norm=LogNorm(vmin=vmin,
                                          vmax=vmax
                                          )
                             )
-        mesh3 = ax3.pcolormesh(t_binedges_dc_hg,
-                               r_binedges_dc_hg / 1e3,
-                               diff_olap_flux_dc_masked,
+        mesh3 = ax3.pcolormesh(t_binedges,
+                               r_binedges / 1e3,
+                               d_olap_dc,
                                cmap='viridis',
                                norm=LogNorm(vmin=vmin,
                                             vmax=vmax
@@ -252,7 +177,107 @@ class DeadtimeCorrect:
         [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
         plt.show()
 
-        quit()
+        return {
+            'd_olap': d_olap,
+            'd_olap_m': d_olap_m,
+            'd_olap_dc': d_olap_dc,
+            'r_binedges': r_binedges,
+            't_binedges': t_binedges
+        }
+
+    def parametric_fit(self, x, y):
+        # TODO: Rewrite this from scratch and start from 1 km. Don't need anything below. Maybe 1.5 km.
+        # # Polynomial fit of arbitrary order (say n = 5)
+        # n = 4
+        # coeffs = np.polyfit(x, y, n)
+        # p = np.poly1d(coeffs.squeeze())
+        # y_fit = p(x)
+
+        def sigmoid_window(x, x0, s):
+            return 1.0 / (1.0 + np.exp((x - x0) / s))
+
+        def composite_cubic_flat(params, x):
+            # params: [a3, a2, a1, a0, D, x0, s]
+            a3, a2, a1, a0, D, x0, s = params
+            C = a3 * x ** 3 + a2 * x ** 2 + a1 * x + a0
+            w = sigmoid_window(x, x0, s)
+            return w * C + (1 - w) * D
+
+        def fit_cubic_then_flat(x, y, weights=None,
+                                fit_x0_and_s=True,
+                                init=None, bounds=None):
+            x = np.asarray(x).ravel()
+            y = np.asarray(y).ravel()
+            assert x.shape == y.shape
+
+            # default initial guesses
+            if init is None:
+                mask_low = x <= 2000
+                if mask_low.sum() >= 4:
+                    p_init = np.polyfit(x[mask_low], y[mask_low], 3)
+                    a3, a2, a1, a0 = p_init
+                else:
+                    a3, a2, a1, a0 = 0.0, 0.0, 0.0, np.median(y[:max(3, len(y) // 10)])
+                D0 = np.median(y[x > 2000]) if np.any(x > 2000) else np.median(y[-10:])
+                x0_0 = 2000
+                s0 = 200
+            else:
+                a3 = init.get('a3', 0.)
+                a2 = init.get('a2', 0.)
+                a1 = init.get('a1', 0.)
+                a0 = init.get('a0', 0.)
+                D0 = init.get('D', np.median(y))
+                x0_0 = init.get('x0', 2000)
+                s0 = init.get('s', 200)
+
+            if fit_x0_and_s:
+                p0 = np.array([a3, a2, a1, a0, D0, x0_0, s0], dtype=float)
+                if bounds is None:
+                    lb = [-np.inf] * 5 + [0.0, 1e-3]  # x0 >=0, s>0
+                    ub = [np.inf] * 5 + [np.max(x), 1000]  # reasonable s
+            else:
+                p0 = np.array([a3, a2, a1, a0, D0], dtype=float)
+                if bounds is None:
+                    lb = [-np.inf] * 5
+                    ub = [np.inf] * 5
+
+            def resid(p):
+                if fit_x0_and_s:
+                    ypred = composite_cubic_flat(p, x)
+                else:
+                    x0_fixed = 2000
+                    s_fixed = 200
+                    p_full = np.concatenate([p, [x0_fixed, s_fixed]])
+                    ypred = composite_cubic_flat(p_full, x)
+                r = y - ypred
+                if weights is not None:
+                    w = np.asarray(weights).ravel()
+                    return r * w
+                return r
+
+            res = least_squares(resid, p0, bounds=(lb, ub))
+
+            def model(x_query):
+                return composite_cubic_flat(res.x, np.asarray(x_query).ravel())
+
+            return {'params': res.x, 'model': model, 'res': res}
+
+        weights = np.where(x < 2000, 5.0, 1.0)   # example SNR weighting
+        result = fit_cubic_then_flat(x, y, weights=weights, fit_x0_and_s=True)
+        print('fitted params:', result['params'])
+        y_fit = result['model'](x)
+
+        # Plot
+        fig = plt.figure(dpi=400, figsize=(8, 6))
+        ax = fig.add_subplot(111)
+        ax.plot(y, x, '.', label='data', alpha=0.5)
+        ax.plot(y_fit, x, '-', label='fit')
+        ax.set_xlabel('Differential Overlap Fit (HG/LG)')
+        ax.set_ylabel('Range [m]')
+        ax.set_title('Fit Results')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
     def deadtime_bg_calc(self, loader, plotter):
         """
@@ -416,103 +441,52 @@ class DeadtimeCorrect:
         plt.tight_layout()
         plt.show()
 
-    def calc_af_hist_manual(self, histogram_results, loader):
+    def calc_af_hist_convolution(self, histogram_results, loader):
         """
         Method to calculate active-fraction histogram using fractional binning.
         """
 
         start_time = time.time()
 
-        # Load relevant chunks
-        # loader.load_chunk()
-        dr_hist = loader.rbinsize  # [m] histogram range resolution
-        dt_hist = loader.tbinsize  # [s] histogram time resolution
-
         # Load bin edges. Remember, min_range_dtime is min_range minus one deadtime interval
         hist_t_binedges = histogram_results['t_binedges']
         hist_r_binedges = histogram_results['r_binedges']
-        min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
+        H = histogram_results['cnts_raw']
+        rbinsize = loader.rbinsize
+        tbinsize = loader.tbinsize
+        PRF = loader.PRF
 
-        # Fine-resolution bin size used to calculate active-fraction (AF) fractional binning
-        dr_af = (self.pulse_width * self.c / 2) if loader.fractional_bin else loader.rbinsize  # [m]
-        dt_af = 1 / self.PRF  # [s]
-        deadtime = self.deadtime_lg if loader.low_gain else self.deadtime_hg  # [s]
+        # min_range_dtime, max_range = hist_r_binedges[0], hist_r_binedges[-1]
+        nrbins = len(hist_r_binedges[:-1])
 
-        # Create fine-res range array
-        rvals_af = np.arange(min_range_dtime + (dr_af / 2), max_range, dr_af)  # [m]
-        n_rbins_af = len(rvals_af)
+        deadtime_range = loader.deadtime * self.c / 2
+        K = np.floor(deadtime_range / rbinsize).astype(int)  # number of bins (floor round) that occupy deadtime
+        dtime_kern = np.ones(K)
+        # Handle remainder. If deadtime is longer than binsize, then tack on fractional bin.
+        # If deadtime is shorter, then only include single fractional bin.
+        if deadtime_range > rbinsize:
+            remainder = deadtime_range % rbinsize
+        else:
+            remainder = deadtime_range / rbinsize
+        dtime_kern = np.append(dtime_kern, remainder)
 
-        # Number of fine-res bins per coarse (histogram) bin
-        shots_per_hist_bin = round(dt_hist / dt_af)
-        af_rbins_per_hist_bin = round(dr_hist / dr_af)
-        deadtime_nbins = np.floor(deadtime / (dr_af / self.c * 2)).astype(int)  # fine-res bin number in deadtime
-
-        # Unpack time-tag ranges and shots
-        ranges = np.concatenate([da.values.ravel() for da in loader.ranges_tot])  # [m]
-        shots_time = np.concatenate([da.values.ravel() for da in loader.shots_time_tot])  # [s]
-
-        # Limit shots and ranges to within xlim (time) window
-        start_idx = np.argmin(np.abs(shots_time - (hist_t_binedges[0])))
-        end_idx = np.argmin(np.abs(shots_time - (hist_t_binedges[-1])))
-        shots_use = shots_time[start_idx:end_idx]
-        ranges_use = ranges[start_idx:end_idx]
-
-        # Limit shots and ranges to within ylim (range) window
-        range_condition = (ranges_use <= max_range) & (ranges_use >= min_range_dtime)
-        shots_use = shots_use[range_condition]
-        ranges_use = ranges_use[range_condition]
-
-        # Create nested list of unique shot indices to iterate for AF calculation
-        shots_vals = np.unique(shots_use)
-        num_dt = round((shots_vals[-1] - shots_vals[0]) / dt_hist)
-        shot_indices = [np.where(shots_use == val)[0] for val in shots_vals]
-
-        # Organize nested list of shot indices based on histogram column
-        shot_indices_split = []
-        prior_cutoff_idx = 0
-        for shot in np.arange(shots_vals[0] + dt_hist, shots_vals[0] + (num_dt + 1) * dt_hist, dt_hist):
-            shot_cutoff_idx = np.searchsorted(shots_vals, shot, side='right')
-            shot_indices_split.append(shot_indices[prior_cutoff_idx:shot_cutoff_idx])
-            prior_cutoff_idx = shot_cutoff_idx
-        shot_indices_flat = [np.concatenate(group) for group in shot_indices_split if group]  # Flatten each column
-        tbin_num = len(shot_indices_flat)  # Number of histogram time bins
-
-        # Fine-res range bin index to trim up to so range array can integer downsample
-        trim_range_idx = round(((len(rvals_af) * dr_af) - (len(rvals_af) * dr_af) % dr_hist) / dr_af)
-        rbin_num_trim = round(trim_range_idx /
-                              af_rbins_per_hist_bin)  # Histogram range bins number to trim to for factorizability
-
-        # Loop through each histogram time column and subtract range bins where the detector was inactive
-        af_hist = np.zeros((rbin_num_trim, tbin_num))
-        af = np.ones((trim_range_idx, tbin_num)) * shots_per_hist_bin
-        for i, idx in enumerate(shot_indices_flat):
-            # Shot-specific ranges
-            ranges_shot = ranges_use[idx]
-
-            # Locate start and end indices for deadtime inactivity
-            deadtime_start_idx = np.searchsorted(rvals_af, ranges_shot, side='left')
-            deadtime_end_idx = np.clip(deadtime_start_idx + deadtime_nbins, a_min=0, a_max=n_rbins_af)
-
-            # Mark dead regions by subtracting 1
-            for start, end in zip(deadtime_start_idx, deadtime_end_idx):
-                af[start:end, i] -= 1
-
-            # Average to match histogram range bins
-            af_trim = af[:, i]
-            af_reshaped = af_trim.reshape(-1, af_rbins_per_hist_bin)
-            af_hist[:, i] = af_reshaped.mean(axis=1)
+        N = tbinsize * PRF  # number of shots per time bin
+        d = fftconvolve(H, dtime_kern[:, None], mode='full') / N
+        d = d[:nrbins, :]
+        a = 1 - d
 
         # Normalize AF histogram
-        self.deadtime_trim_idx = round(deadtime_nbins / af_rbins_per_hist_bin)
-        af_hist = af_hist[self.deadtime_trim_idx:, :] / shots_per_hist_bin
+        af_hist = a[K:, :]
+        self.deadtime_trim_idx = K
 
         print('Elapsed time: {} s'.format(time.time() - start_time))
 
         # Plot AF histogram
         if not self.af_bg:
-            extent_t0, extent_t1 = (shots_vals[0] - (dt_hist / 2)), (shots_vals[-1] + (dt_hist / 2))  # [s]
-            extent_r0, extent_r1 = (hist_r_binedges[round(deadtime_nbins / af_rbins_per_hist_bin)] / 1e3), \
-                                   (hist_r_binedges[round((trim_range_idx - 1) / af_rbins_per_hist_bin)] / 1e3)  # [m]
+            extent_t0, extent_t1 = (hist_t_binedges[0] - (tbinsize / 2)), \
+                                   (hist_t_binedges[-1] + (tbinsize / 2))  # [s]
+            extent_r0, extent_r1 = (hist_r_binedges[K] / 1e3), \
+                                   (hist_r_binedges[-1] / 1e3)  # [m]
             fig = plt.figure(figsize=(8, 4),
                              dpi=400
                              )
@@ -521,17 +495,22 @@ class DeadtimeCorrect:
                            aspect='auto',
                            origin='lower',
                            cmap='viridis',
-                           extent=[extent_t0, extent_t1, extent_r0, extent_r1]
+                           extent=[extent_t0,
+                                   extent_t1,
+                                   extent_r0,
+                                   extent_r1
+                                   ]
                            )
-            cbar = fig.colorbar(im, ax=ax)
+            cbar = fig.colorbar(im,
+                                ax=ax
+                                )
             cbar.set_label('AF Value')
             ax.set_xlabel('Time [s]')
             ax.set_ylabel('Range [km]')
             plt.show()
 
         return {
-            'af_hist': af_hist,
-            'rbin_num_trim': rbin_num_trim
+            'af_hist': af_hist
         }
 
     def plot_bg_est(self, flux, t_binedges, r_binedges, loader):
@@ -573,8 +552,6 @@ class DeadtimeCorrect:
         return selected_region
 
     def deadtime_model_correct(self, af_results, histogram_results):
-        # TODO: Figure out mismatch (by one range bin) between lg and hg outputs
-
         """
         Apply deadtime-model correction by inverting flux and active-fraction histograms.
         """
@@ -582,12 +559,8 @@ class DeadtimeCorrect:
         t_binedges = histogram_results['t_binedges']  # [s]
         r_binedges = histogram_results['r_binedges']  # [m]
         flux_raw = histogram_results['flux_raw']  # [Hz]
-
         af_hist = af_results['af_hist']
-        # rbin_num_trim = af_results['rbin_num_trim']
 
-        # flux_raw = flux_raw[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
-        # r_binedges = r_binedges[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
         flux_raw = flux_raw[self.deadtime_trim_idx:]  # [Hz]
         r_binedges = r_binedges[self.deadtime_trim_idx:]  # [m]
 
@@ -628,15 +601,12 @@ class DeadtimeCorrect:
 
         r_binedges_dc = dc_results['r_binedges']  # [m]
         t_binedges_dc = dc_results['t_binedges']  # [s]
-        # rbin_num_trim = dc_results['rbin_num_trim']
         flux_dc = dc_results['flux_dc_est']  # [Hz]
         flux_raw = dc_results['flux_raw']  # [Hz]
 
         bg_flux_raw = deadtime_bg_results['bg_flux_raw']  # [Hz]
         bg_flux_mueller = deadtime_bg_results['bg_flux_mueller']  # [Hz]
 
-        # flux_m = flux_m[self.deadtime_trim_idx:rbin_num_trim]  # [Hz]
-        # r_binedges_m = r_binedges_m[self.deadtime_trim_idx:(rbin_num_trim + 1)]  # [m]
         flux_m = flux_m[self.deadtime_trim_idx:]  # [Hz]
         r_binedges_m = r_binedges_m[self.deadtime_trim_idx:]  # [m]
 

@@ -41,7 +41,6 @@ class DataLoader:
         self.time_delay_correct = config['process_params']['time_delay_correct']
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
-        # self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
         self.active_fraction = config['process_params']['active_fraction']
         self.fractional_bin = config['process_params']['fractional_bin']
 
@@ -57,9 +56,6 @@ class DataLoader:
         self.xlim = config['plot_params']['xlim']  # [s] x-axis limits
         self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
-        self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
-        self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
-        # then it will plot the available ones
 
     def preprocess(self):
         """
@@ -245,21 +241,13 @@ class DataLoader:
 
         self.deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
 
-        # Round to nearest integer factor for binning. This is for ease of AF calculation later.
-        # Use large bin size for background calculation. Else, use pulse width for fractional binning or histogram range
-        # bin for integer binning
-        smallest_rbinsize = (self.pulse_width * self.c / 2) if self.fractional_bin else self.rbinsize  # [m]
-        if smallest_rbinsize > (self.deadtime / self.c * 2) and not self.fractional_bin:
-            input('AF calculation bin size is larger than the deadtime interval. Will likely create rounding issues.'
-                  'Are you sure you want to proceed? Press any key to continue...')
-        dr_af = self.rbinsize if self.gen_hist_bg else smallest_rbinsize  # [m]
+        dr_af = self.rbinsize  # [m]
         dt_af = 1 / self.PRF  # [s]
 
-        # Round range and time histogram bin size that factorizes the fine-res bin size
-        r_factor = max(1, round(self.rbinsize / dr_af))
+        # Round time histogram bin size that factorizes the fine-res bin size
         t_factor = max(1, round(self.tbinsize / dt_af))
-        rbinsize_close = r_factor * dr_af  # [m]
         tbinsize_close = t_factor * dt_af  # [s]
+        rbinsize = dr_af  # [m]
 
         # Set time and range windows
         deadtime_range = self.deadtime * self.c / 2  # [m]
@@ -268,11 +256,8 @@ class DataLoader:
         else:
             min_time, max_time = shots_time[0], shots_time[-1]  # [s]
         if self.load_ylim:
-            reduce_min = deadtime_range if self.active_fraction and (deadtime_range >= rbinsize_close) else 0
-            # reduce_min = (self.deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
-            # from preceding bins
+            reduce_min = deadtime_range if self.active_fraction and (deadtime_range >= rbinsize) else 0
             min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
-            # min_range = max(min_range, 0)  # [m] set minimum range to zero if deadtime subtraction resulted in a negative value
         else:
             reduce_min = 0
             min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
@@ -284,12 +269,11 @@ class DataLoader:
             ranges = ranges[min_shots_idx:max_shots_idx]
 
         if self.gen_hist_bg:
-            print('Using approximate resolutions for background estimate: {:.3e} m x {:.3e} s.'.format(rbinsize_close, tbinsize_close))
+            print('Using approximate resolutions for background estimate: {:.3e} m x {:.3e} s.'.format(rbinsize, tbinsize_close))
         else:
-            input("Are these approximate resolutions acceptable: {:.3e} m x {:.3e} s? "
-              "Press any key to continue...".format(rbinsize_close, tbinsize_close))
+            print('Using resolutions: {:.3e} m x {:.3e} s.'.format(rbinsize, tbinsize_close))
 
-        self.rbinsize = rbinsize_close
+        self.rbinsize = rbinsize
         self.tbinsize = tbinsize_close
         print('Actual range and time bin sizes: {:.3e} m x {:.3e} s'.format(self.rbinsize, self.tbinsize))
 

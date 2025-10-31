@@ -3,6 +3,7 @@ from pathlib import Path
 from processing.processing_methods.data_loader import DataLoader
 from processing.processing_methods.data_plotter import DataPlotter
 from processing.processing_methods.deadtime_correct import DeadtimeCorrect
+import re
 
 # TODO: Take fft of raw and deadtime-corrected signals to quantify how much deadtime-periodic fluctuations are suppressed
 # TODO: Look into less heterogeneous targets, such as smoke, rayleigh, or stratiform clouds
@@ -35,7 +36,7 @@ class DataPreprocessor:
             fluxes_bg_sub_hg = self.deadtime_correct.plot_binwise_corrections(mueller_results_hg, dc_results_hg, deadtime_bg_results_hg)
 
             self.loader = DataLoader(self.config)
-            self.loader.fname = r'/Dev_1_-_2025-10-08_22.26.35.ARSENL'
+            self.loader.fname = re.sub(r'/Dev_(\d)_-', lambda m: f"/Dev_{1 - int(m.group(1))}_-", self.loader.fname)
             self.loader.preprocess()
             histogram_results_lg = self.loader.gen_histogram()
 
@@ -43,7 +44,6 @@ class DataPreprocessor:
             mueller_results_lg = self.deadtime_correct.mueller_correct(histogram_results_lg, self.loader)
 
             # Calculate deadtime-model correction
-            # af_results_lg = self.deadtime_correct.calc_af_hist_manual(histogram_results_lg, self.loader)
             af_results_lg = self.deadtime_correct.calc_af_hist_convolution(histogram_results_lg, self.loader)
             dc_results_lg = self.deadtime_correct.deadtime_model_correct(af_results_lg, histogram_results_lg)
             deadtime_bg_results_lg = self.deadtime_correct.deadtime_bg_calc(self.loader, self.plotter)
@@ -52,7 +52,11 @@ class DataPreprocessor:
             fluxes_bg_sub_lg = self.deadtime_correct.plot_binwise_corrections(mueller_results_lg, dc_results_lg, deadtime_bg_results_lg)
 
             # Load both channels now
-            self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg, self.loader)
+            overlap_results = self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg, self.loader)
+            r_binedges = overlap_results['r_binedges']
+            dr = r_binedges[1] - r_binedges[0]  # [m]
+            r_centers = r_binedges[:-1] + (dr / 2)  # [m]
+            self.deadtime_correct.parametric_fit(r_centers, overlap_results['d_olap_dc'])
 
 
             quit()

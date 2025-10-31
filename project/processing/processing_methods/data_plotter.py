@@ -7,7 +7,6 @@ from pathlib import Path
 
 class DataPlotter:
     def __init__(self, config):
-        self.flux_bg_sub = False
         self.cbar_min = None
         self.cbar_max = None
 
@@ -32,9 +31,6 @@ class DataPlotter:
         self.save_dpi = config['plot_params']['save_dpi']  # DPI for saved images
         self.dot_size = config['plot_params']['dot_size']  # Dot size for 'axes.scatter' 's' param
         # subtracted and range corrected
-        self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
-        self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
-        # then it will plot the available ones
         self.alpha = config['plot_params']['alpha']  # alpha value when plotting
 
     def plot_histogram(self, histogram_results, loader):
@@ -46,7 +42,6 @@ class DataPlotter:
         """
         # Processed data
         flux_raw = histogram_results['flux_raw']
-        # flux_bg_sub = histogram_results['flux_bg_sub']
         t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
         r_binedges = histogram_results['r_binedges']  # [m] range bin edges
 
@@ -58,28 +53,16 @@ class DataPlotter:
                          figsize=(self.figsize[0], self.figsize[1])
                          )
         ax = fig.add_subplot(111)
-        if self.flux_bg_sub:
-            mesh = ax.pcolormesh(t_binedges,
-                                 r_binedges / 1e3,
-                                 flux_bg_sub,
-                                 cmap='viridis',
-                                 norm=LogNorm(vmin=self.cbar_min,
-                                              vmax=self.cbar_max)
-                                 )
-            fig.suptitle('CoBaLT Background-Subtracted Backscatter Flux')
-            cbar = fig.colorbar(mesh, ax=ax)
-            cbar.set_label('Flux [Hz]')
-        else:
-            mesh = ax.pcolormesh(t_binedges,
-                                 r_binedges / 1e3,
-                                 flux_raw,
-                                 cmap='viridis',
-                                 norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
-                                              vmax=flux_raw.max())
-                                 )
-            fig.suptitle('CoBaLT Backscatter Flux')
-            cbar = fig.colorbar(mesh, ax=ax)
-            cbar.set_label('Flux [Hz]')
+        mesh = ax.pcolormesh(t_binedges,
+                             r_binedges / 1e3,
+                             flux_raw,
+                             cmap='viridis',
+                             norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
+                                          vmax=flux_raw.max())
+                             )
+        fig.suptitle('CoBaLT Backscatter Flux')
+        cbar = fig.colorbar(mesh, ax=ax)
+        cbar.set_label('Flux [Hz]')
         ax.set_xlabel('Time since {}:{}:{} LT [s]'.format(loader.timestamp.hour,
                                                           loader.timestamp.minute,
                                                           loader.timestamp.second)
@@ -129,7 +112,6 @@ class DataPlotter:
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
-        # ax.set_aspect('equal')
         ax.set_title(
             'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))
         plt.tight_layout()
