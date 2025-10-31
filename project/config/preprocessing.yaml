@@ -40,12 +40,12 @@ plot_params:
   histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 150   # [s] temporal bin size
-  rbinsize: 30   # [m] range bin size
+  tbinsize: 500   # [s] temporal bin size
+  rbinsize: 500   # [m] range bin size
   ylim: [0.0, 8.1]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [100, 250.1]  # [s] excluding last value if histogram
+  xlim: [100, 600.1]  # [s] excluding last value if histogram
   chunk_start: 0  # Starting chunk when plotting chunks (0   indexed)
   chunk_num: 2  # Watch chunk number >= 6 for RAM. Total number of chunks to plot. If it exceeds the number of remaining chunks, then it will only plot what's available.
 

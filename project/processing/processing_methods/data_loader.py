@@ -262,15 +262,17 @@ class DataLoader:
         tbinsize_close = t_factor * dt_af  # [s]
 
         # Set time and range windows
+        deadtime_range = self.deadtime * self.c / 2  # [m]
         if self.load_xlim:
             min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
         else:
             min_time, max_time = shots_time[0], shots_time[-1]  # [s]
         if self.load_ylim:
-            reduce_min = (self.deadtime * self.c / 2) if self.active_fraction and (self.deadtime >= rbinsize_close) else 0
+            reduce_min = deadtime_range if self.active_fraction and (deadtime_range >= rbinsize_close) else 0
             # reduce_min = (self.deadtime * self.c / 2) if self.active_fraction else 0  # [m] To calculate deadtime impact
             # from preceding bins
-            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
+            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
+            # min_range = max(min_range, 0)  # [m] set minimum range to zero if deadtime subtraction resulted in a negative value
         else:
             reduce_min = 0
             min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
@@ -379,19 +381,26 @@ class DataLoader:
         tmax = self.xlim[1]  # [s]
 
         # Set tmin to first shot time if minimum value is 0
-        if tmin == 0:
-            tmin = 1 / self.PRF  # [s]
+        tmin = 1 / self.PRF if tmin == 0 else tmin
 
         # chunk = self.chunk_start
         loaded = 0
         covered_start = False
         covered_end = False
-        files = sorted(glob.glob(os.path.join(self.preprocess_path, f'{self.generic_fname}_*.nc')))
+
+        # Get all chunk files
+        files = glob.glob(os.path.join(self.preprocess_path, f'{self.generic_fname}_*.nc'))
+
+        # --- 🔧 Sort files numerically by their chunk index ---
+        def extract_chunk_number(path):
+            match = re.search(r'_(\d+)\.nc$', os.path.basename(path))
+            return int(match.group(1)) if match else -1
+
+        files = sorted(files, key=extract_chunk_number)
+
+        # files = sorted(glob.glob(os.path.join(self.preprocess_path, f'{self.generic_fname}_*.nc')))
         print('Locating and loading relevant netcdf data chunks...')
         for file_path in files:
-
-        # for i in range(self.chunk_num):
-        #     file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
 
             # Open metadata only (don't load full data)
             with xr.open_dataset(file_path, decode_times=False) as ds:
@@ -431,28 +440,6 @@ class DataLoader:
                 else:
                     print(f'Skipping chunk #{chunk}: {t0:.2f}–{t1:.2f}s not in range {tmin:.2f}–{tmax:.2f}s')
         print('Loaded {} files'.format(loaded))
-
-
-        # chunk = self.chunk_start
-        # for i in range(self.chunk_num):
-        #     file_path = os.path.join(self.preprocess_path, self.generic_fname + f'_{chunk}.nc')
-        #     # If file exists, load it.
-        #     if glob.glob(file_path):
-        #         print(f'\nPreprocessed file found: chunk #{chunk}')
-        #         ds = xr.open_dataset(file_path)
-        #         self.ranges_tot.append(ds['ranges'])
-        #         self.shots_time_tot.append(ds['shots_time'])
-        #         print('\nFile loaded.')
-        #         chunk += 1
-        #     # If file does not exist, either config settings for loading are wrong or ran out of chunks to load.
-        #     else:
-        #         print(f'\nPreprocessed file not found... check this')
-        #         if chunk == self.chunk_start:
-        #             print('Starting chunk unavailable! Pick a different one.')
-        #             quit()
-        #         else:
-        #             print('\nNo more chunks. Starting to plot...')
-        #             break
 
     def parse_filename(self):
         """

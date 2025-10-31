@@ -171,17 +171,23 @@ class DeadtimeCorrect:
         mesh1 = ax1.pcolormesh(t_binedges_dc_hg,
                                r_binedges_dc_hg / 1e3,
                                diff_olap_flux_masked,
-                               cmap='viridis'
+                               cmap='viridis',
+                               vmin=vmin,
+                               vmax=vmax
                                )
         __ = ax2.pcolormesh(t_binedges_m_hg,
                             r_binedges_m_hg / 1e3,
                             diff_olap_flux_m_masked,
-                            cmap='viridis'
+                            cmap='viridis',
+                            vmin=vmin,
+                            vmax=vmax
                             )
         mesh3 = ax3.pcolormesh(t_binedges_dc_hg,
                                r_binedges_dc_hg / 1e3,
                                diff_olap_flux_dc_masked,
-                               cmap='viridis'
+                               cmap='viridis',
+                               vmin=vmin,
+                               vmax=vmax
                                )
         ax1.set_xlabel('Time [s]')
         ax1.set_ylabel('Range [km]')
@@ -271,7 +277,7 @@ class DeadtimeCorrect:
             tbinsize_bg_est = (loader.xlim[1] - loader.xlim[0]) / 5
         elif dt > 50:
             mid = (x0 + x1) / 2
-            loader.xlim, tbinsize_bg_est = [mid - 25, mid + 25], 25
+            loader.xlim, tbinsize_bg_est = [mid - 25, mid + 25], 10
         else:
             tbinsize_bg_est = width / 5
 
