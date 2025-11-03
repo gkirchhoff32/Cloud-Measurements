@@ -185,6 +185,8 @@ class DeadtimeCorrect:
             't_binedges': t_binedges
         }
 
+    print('okay')
+
     def deadtime_bg_calc(self, loader, plotter):
         """
         Method to estimate background flux.
