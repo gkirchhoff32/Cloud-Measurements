@@ -185,6 +185,100 @@ class DeadtimeCorrect:
             't_binedges': t_binedges
         }
 
+    def parametric_fit(self, x, y):
+        # TODO: Rewrite this from scratch and start from 1 km. Don't need anything below. Maybe 1.5 km.
+        # # Polynomial fit of arbitrary order (say n = 5)
+        # n = 4
+        # coeffs = np.polyfit(x, y, n)
+        # p = np.poly1d(coeffs.squeeze())
+        # y_fit = p(x)
+
+        def sigmoid_window(x, x0, s):
+            return 1.0 / (1.0 + np.exp((x - x0) / s))
+
+        def composite_cubic_flat(params, x):
+            # params: [a3, a2, a1, a0, D, x0, s]
+            a3, a2, a1, a0, D, x0, s = params
+            C = a3 * x ** 3 + a2 * x ** 2 + a1 * x + a0
+            w = sigmoid_window(x, x0, s)
+            return w * C + (1 - w) * D
+
+        def fit_cubic_then_flat(x, y, weights=None,
+                                fit_x0_and_s=True,
+                                init=None, bounds=None):
+            x = np.asarray(x).ravel()
+            y = np.asarray(y).ravel()
+            assert x.shape == y.shape
+
+            # default initial guesses
+            if init is None:
+                mask_low = x <= 2000
+                if mask_low.sum() >= 4:
+                    p_init = np.polyfit(x[mask_low], y[mask_low], 3)
+                    a3, a2, a1, a0 = p_init
+                else:
+                    a3, a2, a1, a0 = 0.0, 0.0, 0.0, np.median(y[:max(3, len(y) // 10)])
+                D0 = np.median(y[x > 2000]) if np.any(x > 2000) else np.median(y[-10:])
+                x0_0 = 2000
+                s0 = 200
+            else:
+                a3 = init.get('a3', 0.)
+                a2 = init.get('a2', 0.)
+                a1 = init.get('a1', 0.)
+                a0 = init.get('a0', 0.)
+                D0 = init.get('D', np.median(y))
+                x0_0 = init.get('x0', 2000)
+                s0 = init.get('s', 200)
+
+            if fit_x0_and_s:
+                p0 = np.array([a3, a2, a1, a0, D0, x0_0, s0], dtype=float)
+                if bounds is None:
+                    lb = [-np.inf] * 5 + [0.0, 1e-3]  # x0 >=0, s>0
+                    ub = [np.inf] * 5 + [np.max(x), 1000]  # reasonable s
+            else:
+                p0 = np.array([a3, a2, a1, a0, D0], dtype=float)
+                if bounds is None:
+                    lb = [-np.inf] * 5
+                    ub = [np.inf] * 5
+
+            def resid(p):
+                if fit_x0_and_s:
+                    ypred = composite_cubic_flat(p, x)
+                else:
+                    x0_fixed = 2000
+                    s_fixed = 200
+                    p_full = np.concatenate([p, [x0_fixed, s_fixed]])
+                    ypred = composite_cubic_flat(p_full, x)
+                r = y - ypred
+                if weights is not None:
+                    w = np.asarray(weights).ravel()
+                    return r * w
+                return r
+
+            res = least_squares(resid, p0, bounds=(lb, ub))
+
+            def model(x_query):
+                return composite_cubic_flat(res.x, np.asarray(x_query).ravel())
+
+            return {'params': res.x, 'model': model, 'res': res}
+
+        weights = np.where(x < 2000, 5.0, 1.0)   # example SNR weighting
+        result = fit_cubic_then_flat(x, y, weights=weights, fit_x0_and_s=True)
+        print('fitted params:', result['params'])
+        y_fit = result['model'](x)
+
+        # Plot
+        fig = plt.figure(dpi=400, figsize=(8, 6))
+        ax = fig.add_subplot(111)
+        ax.plot(y, x, '.', label='data', alpha=0.5)
+        ax.plot(y_fit, x, '-', label='fit')
+        ax.set_xlabel('Differential Overlap Fit (HG/LG)')
+        ax.set_ylabel('Range [m]')
+        ax.set_title('Fit Results')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+
     def deadtime_bg_calc(self, loader, plotter):
         """
         Method to estimate background flux.
