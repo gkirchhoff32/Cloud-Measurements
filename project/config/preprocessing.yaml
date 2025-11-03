@@ -13,7 +13,8 @@ file_params:
   date: '/20251008'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # date: '/Timing and Range Tests/range_test'
   # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
-  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  data_dir: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
@@ -30,6 +31,7 @@ process_params:
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
   fractional_bin: True  # Set TRUE if using fractional binning in range. FALSE will use final histogram resolution when calculating AF. 
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
+  bg_sub: False  # Set TRUE to background subtract. Set FALSE to skip. 
 
 plot_params:
   plot_ylim: True  # Set TRUE to limit vertical range when plotting

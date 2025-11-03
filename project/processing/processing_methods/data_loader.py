@@ -43,6 +43,7 @@ class DataLoader:
         self.range_shift = config['process_params']['range_shift']
         self.active_fraction = config['process_params']['active_fraction']
         self.fractional_bin = config['process_params']['fractional_bin']
+        self.bg_sub = config['process_params']['bg_sub']  # TRUE to background calculate and subtract. FALSE to skip.
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
@@ -64,12 +65,16 @@ class DataLoader:
         Then convert ".ARSENL" data to netCDF format (".nc") and write out file.
         """
 
+        self.data_dir = self.find_data_path(self.data_dir)
+
         # Important file names and paths
         self.generic_fname = Path(self.fname).stem
         self.fname_nc = self.generic_fname + '.nc'
         self.preprocess_path = self.data_dir + self.preprocessed_dir + self.date
         self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
         self.parse_filename()
+
+
 
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
@@ -443,12 +448,14 @@ class DataLoader:
         self.timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
         print("Measurement time: {}".format(self.timestamp))
 
-    @staticmethod
-    def calc_bg(flux, rbins, tbins, bg_r_edges, bg_t_edges):
+    def calc_bg(self, flux, rbins, tbins, bg_r_edges, bg_t_edges):
         # Estimate background flux
-        bg_r_edges_idx = [np.argmin(np.abs(rbins - bg_r_edges[0])), np.argmin(np.abs(rbins - bg_r_edges[1]))]
-        bg_t_edges_idx = [np.argmin(np.abs(tbins - bg_t_edges[0])), np.argmin(np.abs(tbins - bg_t_edges[1]))]
-        bg_flux = np.mean(flux[bg_r_edges_idx[0]:bg_r_edges_idx[1], bg_t_edges_idx[0]:bg_t_edges_idx[1]])  # [Hz]
+        if self.bg_sub:
+            bg_r_edges_idx = [np.argmin(np.abs(rbins - bg_r_edges[0])), np.argmin(np.abs(rbins - bg_r_edges[1]))]
+            bg_t_edges_idx = [np.argmin(np.abs(tbins - bg_t_edges[0])), np.argmin(np.abs(tbins - bg_t_edges[1]))]
+            bg_flux = np.mean(flux[bg_r_edges_idx[0]:bg_r_edges_idx[1], bg_t_edges_idx[0]:bg_t_edges_idx[1]])  # [Hz]
+        else:
+            bg_flux = 0  # [Hz]
 
         return bg_flux
 
@@ -470,4 +477,26 @@ class DataLoader:
             filename = f"{base}_{counter}{ext}"
             counter += 1
         return filename
+
+    @staticmethod
+    def find_data_path(data_dir):
+        """
+        Automatically detect relevant file path for data loading. Update "candidate_roots" list if new data file paths
+        are required.
+        """
+        target_subdir = data_dir
+
+        # Likely parent roots — you can add others if needed
+        candidate_roots = [
+            Path("F:/"),
+            Path("C:/Users/Grant"),
+        ]
+
+        for root in candidate_roots:
+            candidate = root / target_subdir
+            if candidate.exists():
+                print(f"Detected data directory: {candidate}")
+                return str(candidate)
+
+        raise FileNotFoundError("Could not locate the 'OneDrive - UCB-O365' data directory.")
 

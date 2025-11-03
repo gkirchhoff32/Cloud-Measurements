@@ -252,7 +252,10 @@ class DeadtimeCorrect:
                                      t_binedges_bg_est,
                                      bg_r_edges,
                                      bg_t_edges)  # [Hz]
-        print('Raw flux background estimate: {:.3e} Hz'.format(bg_flux_raw))
+        if loader.bg_sub:
+            print('Raw flux background estimate: {:.3e} Hz'.format(bg_flux_raw))
+        else:
+            print('Skipping background estimate. Set background to {} Hz.'.format(bg_flux_raw))
 
         # Apply Mueller correction and then calculate background
         mueller_results_bg_est = self.mueller_correct(histogram_results_bg_est, loader)  # [Hz]
@@ -264,7 +267,8 @@ class DeadtimeCorrect:
                                          t_binedges_m_bg_est,
                                          bg_r_edges,
                                          bg_t_edges)  # [Hz]
-        print('Mueller-corrected flux background estimate: {:.3e} Hz'.format(bg_flux_mueller))
+        if loader.bg_sub:
+            print('Mueller-corrected flux background estimate: {:.3e} Hz'.format(bg_flux_mueller))
 
         # Restore config file values
         loader.load_xlim, loader.load_ylim = load_xlim, load_ylim
