@@ -74,8 +74,6 @@ class DataLoader:
         self.file_path_nc = Path(self.preprocess_path) / self.fname_nc
         self.parse_filename()
 
-
-
         # Load preprocessed data (chunk) if exists. Otherwise, preprocess and save out results to .nc file.
         if glob.glob(os.path.join(self.preprocess_path, self.generic_fname + '_*.nc')):
             print('\nPreprocessed data file(s) found. No need to create new one(s)...')
