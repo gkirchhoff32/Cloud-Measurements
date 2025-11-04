@@ -31,7 +31,7 @@ process_params:
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
   fractional_bin: True  # Set TRUE if using fractional binning in range. FALSE will use final histogram resolution when calculating AF. 
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
-  bg_sub: False  # Set TRUE to background subtract. Set FALSE to skip. 
+  bg_sub: True  # Set TRUE to background subtract. Set FALSE to skip. 
 
 plot_params:
   plot_ylim: True  # Set TRUE to limit vertical range when plotting
@@ -39,12 +39,12 @@ plot_params:
   histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 100   # [s] temporal bin size
-  rbinsize: 30   # [m] range bin size
+  tbinsize: 200   # [s] temporal bin size
+  rbinsize: 100   # [m] range bin size
   ylim: [0.1, 10]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [100, 200.1]  # [s] excluding last value if histogram
+  xlim: [100, 300.1]  # [s] excluding last value if histogram
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images

@@ -190,95 +190,101 @@ class DeadtimeCorrect:
         Method to estimate background flux.
         """
 
-        # Store config value to restore later
-        load_xlim, load_ylim = loader.load_xlim, loader.load_ylim
-        plot_xlim, plot_ylim = plotter.plot_xlim, plotter.plot_ylim
-        tbinsize, rbinsize = loader.tbinsize, loader.rbinsize
-
-        # When estimating background, load entire vertical range while limiting time bounds. This balances load time.
-        loader.load_xlim, loader.load_ylim = True, False
-        plotter.plot_xlim, plotter.plot_ylim = False, False
-
-        x0, x1 = loader.xlim
-        dt = loader.tbinsize
-        width = x1 - x0
-
-        if dt < 5:
-            loader.xlim = [max(0, x0 - dt * 3), x1 + dt * 3]
-            tbinsize_bg_est = (loader.xlim[1] - loader.xlim[0]) / 5
-        elif dt > 50:
-            mid = (x0 + x1) / 2
-            loader.xlim, tbinsize_bg_est = [mid - 25, mid + 25], 10
-        else:
-            tbinsize_bg_est = width / 5
-
-        loader.tbinsize, loader.rbinsize = tbinsize_bg_est, self.rbinsize_bg_est  # [s], [m] Large bin sizes
-        loader.gen_hist_bg = True
-
-        # Load histogram that includes background signal
-        histogram_results_bg_est = loader.gen_histogram()
-        flux_raw_bg_est = histogram_results_bg_est['flux_raw']
-        r_binedges_bg_est = histogram_results_bg_est['r_binedges']
-        t_binedges_bg_est = histogram_results_bg_est['t_binedges']
-
-        # Select window to estimate background using box-selection GUI or typing in values.
-        while True:
-            show_hg = input('\nShow histogram to estimate background? (Y/N)')
-
-            # Rectangle selection GUI for window
-            if (show_hg == 'Y') or (show_hg == 'y'):
-                selected_region = self.plot_bg_est(flux_raw_bg_est, t_binedges_bg_est, r_binedges_bg_est, loader)
-
-                min_r_bg, max_r_bg = selected_region['y0'], selected_region['y1']  # [km]
-                min_t_bg, max_t_bg = selected_region['x0'], selected_region['x1']  # [s]
-                break
-            # Typing window coordinates manually
-            elif (show_hg == 'N') or (show_hg == 'n'):
-                bg_ranges = input('Please input range bounds [km] for background estimation (comma separated):')
-                bg_times = input('Please input time bounds [s] for background estimation (comma separated):')
-
-                min_r_bg, max_r_bg = map(float, bg_ranges.split(","))  # [km]
-                min_t_bg, max_t_bg = map(float, bg_times.split(","))  # [s]
-                break
-            else:
-                print('Please input "Y" or "N".')
-
-        bg_r_edges = np.array([min_r_bg, max_r_bg]) * 1e3  # [m]
-        bg_t_edges = np.array([min_t_bg, max_t_bg])  # [s]
-
-        # Calculate background from raw data
-        bg_flux_raw = loader.calc_bg(flux_raw_bg_est,
-                                     r_binedges_bg_est,
-                                     t_binedges_bg_est,
-                                     bg_r_edges,
-                                     bg_t_edges)  # [Hz]
         if loader.bg_sub:
-            print('Raw flux background estimate: {:.3e} Hz'.format(bg_flux_raw))
-        else:
-            print('Skipping background estimate. Set background to {} Hz.'.format(bg_flux_raw))
+            # Store config value to restore later
+            load_xlim, load_ylim = loader.load_xlim, loader.load_ylim
+            plot_xlim, plot_ylim = plotter.plot_xlim, plotter.plot_ylim
+            tbinsize, rbinsize = loader.tbinsize, loader.rbinsize
 
-        # Apply Mueller correction and then calculate background
-        mueller_results_bg_est = self.mueller_correct(histogram_results_bg_est, loader)  # [Hz]
-        flux_mueller_bg_est = mueller_results_bg_est['flux_mueller']  # [Hz]
-        r_binedges_m_bg_est = mueller_results_bg_est['r_binedges']  # [m]
-        t_binedges_m_bg_est = mueller_results_bg_est['t_binedges']  # [s]
-        bg_flux_mueller = loader.calc_bg(flux_mueller_bg_est,
-                                         r_binedges_m_bg_est,
-                                         t_binedges_m_bg_est,
+            # When estimating background, load upper end of vertical range while limiting time bounds.
+            loader.load_xlim, loader.load_ylim = True, True
+            plotter.plot_xlim, plotter.plot_ylim = True, True
+
+            x0, x1 = loader.xlim
+            dt = loader.tbinsize
+            width = x1 - x0
+
+            loader.ylim = [9.5, 10.11]  # [km]
+
+            if dt < 5:
+                loader.xlim = [max(0, x0 - dt * 3), x1 + dt * 3]
+                tbinsize_bg_est = (loader.xlim[1] - loader.xlim[0]) / 5
+            elif dt > 50:
+                mid = (x0 + x1) / 2
+                loader.xlim, tbinsize_bg_est = [mid - 25, mid + 25], 10
+            else:
+                tbinsize_bg_est = width / 5
+
+            loader.tbinsize, loader.rbinsize = tbinsize_bg_est, self.rbinsize_bg_est  # [s], [m] Large bin sizes
+            loader.gen_hist_bg = True
+
+            # Load histogram that includes background signal
+            histogram_results_bg_est = loader.gen_histogram()
+            flux_raw_bg_est = histogram_results_bg_est['flux_raw']
+            r_binedges_bg_est = histogram_results_bg_est['r_binedges']
+            t_binedges_bg_est = histogram_results_bg_est['t_binedges']
+
+            # Select window to estimate background using box-selection GUI or typing in values.
+            while True:
+                show_hg = input('\nShow histogram to estimate background? (Y/N)')
+
+                # Rectangle selection GUI for window
+                if (show_hg == 'Y') or (show_hg == 'y'):
+                    selected_region = self.plot_bg_est(flux_raw_bg_est, t_binedges_bg_est, r_binedges_bg_est, loader)
+
+                    min_r_bg, max_r_bg = selected_region['y0'], selected_region['y1']  # [km]
+                    min_t_bg, max_t_bg = selected_region['x0'], selected_region['x1']  # [s]
+                    break
+                # Typing window coordinates manually
+                elif (show_hg == 'N') or (show_hg == 'n'):
+                    bg_ranges = input('Please input range bounds [km] for background estimation (comma separated):')
+                    bg_times = input('Please input time bounds [s] for background estimation (comma separated):')
+
+                    min_r_bg, max_r_bg = map(float, bg_ranges.split(","))  # [km]
+                    min_t_bg, max_t_bg = map(float, bg_times.split(","))  # [s]
+                    break
+                else:
+                    print('Please input "Y" or "N".')
+
+            bg_r_edges = np.array([min_r_bg, max_r_bg]) * 1e3  # [m]
+            bg_t_edges = np.array([min_t_bg, max_t_bg])  # [s]
+
+            # Calculate background from raw data
+            bg_flux_raw = loader.calc_bg(flux_raw_bg_est,
+                                         r_binedges_bg_est,
+                                         t_binedges_bg_est,
                                          bg_r_edges,
                                          bg_t_edges)  # [Hz]
-        if loader.bg_sub:
+            print('Raw flux background estimate: {:.3e} Hz'.format(bg_flux_raw))
+
+            # Apply Mueller correction and then calculate background
+            mueller_results_bg_est = self.mueller_correct(histogram_results_bg_est, loader)  # [Hz]
+            flux_mueller_bg_est = mueller_results_bg_est['flux_mueller']  # [Hz]
+            r_binedges_m_bg_est = mueller_results_bg_est['r_binedges']  # [m]
+            t_binedges_m_bg_est = mueller_results_bg_est['t_binedges']  # [s]
+            bg_flux_mueller = loader.calc_bg(flux_mueller_bg_est,
+                                             r_binedges_m_bg_est,
+                                             t_binedges_m_bg_est,
+                                             bg_r_edges,
+                                             bg_t_edges)  # [Hz]
             print('Mueller-corrected flux background estimate: {:.3e} Hz'.format(bg_flux_mueller))
 
-        # Restore config file values
-        loader.load_xlim, loader.load_ylim = load_xlim, load_ylim
-        plotter.plot_xlim, plotter.plot_ylim = plot_xlim, plot_ylim
-        loader.tbinsize, loader.rbinsize = tbinsize, rbinsize
+            # Restore config file values
+            loader.load_xlim, loader.load_ylim = load_xlim, load_ylim
+            plotter.plot_xlim, plotter.plot_ylim = plot_xlim, plot_ylim
+            loader.tbinsize, loader.rbinsize = tbinsize, rbinsize
 
-        return {
-            'bg_flux_raw': bg_flux_raw,
-            'bg_flux_mueller': bg_flux_mueller
-        }
+            return {
+                'bg_flux_raw': bg_flux_raw,
+                'bg_flux_mueller': bg_flux_mueller
+            }
+        else:
+            print('Skipping background estimates. Set background flux to 0 Hz.')
+
+            return {
+                'bg_flux_raw': 0,
+                'bg_flux_mueller': 0
+            }
 
     def mueller_correct(self, histogram_results, loader):
         """
@@ -433,12 +439,13 @@ class DeadtimeCorrect:
                              r_binedges / 1e3,
                              flux,
                              cmap='viridis',
-                             norm=LogNorm(vmin=np.nanmin(flux[flux > 0]),
-                                          vmax=np.nanmax(flux))
+                             vmin=np.nanmin(flux[flux > 0]),
+                             vmax=np.nanmax(flux)
                              )
         cbar = fig.colorbar(mesh, ax=ax)
         cbar.set_label('Flux [Hz]')
         ax.set_xlim([t_binedges[0], t_binedges[-1]])
+        ax.set_ylim([r_binedges[0] / 1e3, r_binedges[-1] / 1e3])
         ax.set_xlabel('Time [s]')
         ax.set_ylabel('Range [km]')
         ax.set_title('Scale {:.1f} m x {:.2f} s\n{} {}'.format(loader.rbinsize, loader.tbinsize,
@@ -456,7 +463,6 @@ class DeadtimeCorrect:
             spancoords='data',
             interactive=True
         )
-
         plt.show(block=True)
 
         return selected_region
