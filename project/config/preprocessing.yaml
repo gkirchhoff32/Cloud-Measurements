@@ -41,7 +41,7 @@ plot_params:
 
   tbinsize: 200   # [s] temporal bin size
   rbinsize: 100   # [m] range bin size
-  ylim: [0.1, 10]  # [km] excluding last value if histogram
+  ylim: [0.1, 8.8]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
   xlim: [100, 300.1]  # [s] excluding last value if histogram
