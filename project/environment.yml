@@ -7,6 +7,7 @@ dependencies:
   - pandas=1.4.3
   - pyqt=5.15.4
   - python=3.10.19
+  - pip=25.2
   - pip:
       - asttokens==2.0.5
       - attrs==25.1.0
