@@ -12,10 +12,8 @@ system_params:
 file_params:
   date: '/20251008'  # YYYYMMDD. Will search for and save files in the identically named directories. 
   # date: '/Timing and Range Tests/range_test'
-  # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
-  # data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
-  data_dir: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
-  # data_dir: '/home/grki4829/Data'  # For arsenl-red linux server
+  data_dir_win: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  data_dir_lin: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
   fname: '/Dev_0_-_2025-10-08_22.26.35.ARSENL'  # main data file name
@@ -44,7 +42,7 @@ plot_params:
   ylim: [0.1, 8.8]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [1000, 1100.1]  # [s] excluding last value if histogram
+  xlim: [0, 100.1]  # [s] excluding last value if histogram
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images

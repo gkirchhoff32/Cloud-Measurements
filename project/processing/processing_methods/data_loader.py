@@ -47,10 +47,14 @@ class DataLoader:
 
         # File params
         self.fname = config['file_params']['fname']  # File name of raw data
-        self.data_dir = config['file_params']['data_dir']  # Directory of raw data
         self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
         self.image_dir = config['file_params']['image_dir']  # Directory to save images
         self.date = config['file_params']['date']  # YYYYMMDD: points to identically named directories
+        # Choose data directory based on OS
+        if os.name == 'nt':  # Windows
+            self.data_dir = config['file_params']['data_dir_win']
+        else:  # Linux/Unix
+            self.data_dir = config['file_params']['data_dir_lin']
 
         # Plot params
         self.ylim = config['plot_params']['ylim']  # [km] y-axis limits
@@ -479,22 +483,45 @@ class DataLoader:
     @staticmethod
     def find_data_path(data_dir):
         """
-        Automatically detect relevant file path for data loading. Update "candidate_roots" list if new data file paths
-        are required.
+        Automatically detect relevant file path for data loading based on OS.
+        For Windows, checks common drive letters and user paths.
+        For Linux, uses the data_dir as is or checks common mount points.
         """
-        target_subdir = data_dir
-
-        # Likely parent roots — you can add others if needed
-        candidate_roots = [
-            Path("F:/"),
-            Path("C:/Users/Grant"),
-        ]
-
-        for root in candidate_roots:
-            candidate = root / target_subdir
-            if candidate.exists():
-                print(f"Detected data directory: {candidate}")
-                return str(candidate)
-
-        raise FileNotFoundError("Could not locate the 'OneDrive - UCB-O365' data directory.")
+        # Detect operating system
+        if os.name == 'nt':  # Windows
+            target_subdir = data_dir
+            # Windows candidate paths
+            candidate_roots = [
+                Path("F:/"),
+                Path("C:/Users/Grant"),
+            ]
+            
+            for root in candidate_roots:
+                candidate = root / target_subdir
+                if candidate.exists():
+                    print(f"Detected Windows data directory: {candidate}")
+                    return str(candidate)
+                    
+            raise FileNotFoundError("Could not locate the Windows data directory.")
+        
+        else:  # Linux/Unix
+            # For Linux, first try the direct path
+            linux_path = Path(data_dir)
+            if linux_path.exists():
+                print(f"Using Linux data directory: {linux_path}")
+                return str(linux_path)
+            
+            # If direct path doesn't exist, check common Linux mount points
+            linux_candidates = [
+                Path("/home/grki4829/Data"),
+                Path("/data"),
+                Path("/mnt/data"),
+            ]
+            
+            for candidate in linux_candidates:
+                if candidate.exists():
+                    print(f"Detected Linux data directory: {candidate}")
+                    return str(candidate)
+                    
+            raise FileNotFoundError("Could not locate the Linux data directory.")
 

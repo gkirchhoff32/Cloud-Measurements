@@ -7,8 +7,13 @@ and laser shots. Plot the data in scatter or histogram format.
 09.19.2025
 """
 
+import sys
 import yaml
 from pathlib import Path
+
+# Add the project root directory to Python path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
 
 from processing.data_preprocessor_v2 import DataPreprocessor
 
