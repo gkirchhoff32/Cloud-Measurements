@@ -71,17 +71,19 @@ class DeadtimeCorrect:
         colors = ['C0', 'C1', 'C2']
         for i in range(len(d_olap[0, :])):
             ax.plot(d_olap[:, i], r_centers / 1e3, '-', color=colors[0], alpha=0.25)
-            ax.plot(d_olap_m[:, i], r_centers / 1e3, '-', color=colors[1], alpha=0.25)
+            # ax.plot(d_olap_m[:, i], r_centers / 1e3, '-', color=colors[1], alpha=0.25)
             ax.plot(d_olap_dc[:, i], r_centers / 1e3, '-', color=colors[2], alpha=0.25)
         ax.set_ylabel('Range [km]')
         ax.set_xlabel('Differential Overlap (HG/LG)')
-        ax.set_title('Differential Overlap')
+        start_time = t_binedges[0]  # time offset from timestamp
+        ax.set_title('Differential Overlap\n{} + {:.2f}s'.format(loader.timestamp, start_time))
         ax.set_xscale('log')
         handles = [
             plt.Line2D([0], [0], color=colors[0], linestyle='-', label='No Correction'),
-            plt.Line2D([0], [0], color=colors[1], linestyle='-', label='Mueller'),
+            # plt.Line2D([0], [0], color=colors[1], linestyle='-', label='Mueller'),
             plt.Line2D([0], [0], color=colors[2], linestyle='-', label='Deadtime Model'),
         ]
+        ax.set_xlim([10, 200])
         plt.legend(handles=handles)
         plt.tight_layout()
         plt.show()
@@ -218,18 +220,18 @@ class DeadtimeCorrect:
             loader.tbinsize, loader.rbinsize = tbinsize_bg_est, self.rbinsize_bg_est  # [s], [m] Large bin sizes
             loader.gen_hist_bg = True
 
-            # Load histogram that includes background signal
-            histogram_results_bg_est = loader.gen_histogram()
-            flux_raw_bg_est = histogram_results_bg_est['flux_raw']
-            r_binedges_bg_est = histogram_results_bg_est['r_binedges']
-            t_binedges_bg_est = histogram_results_bg_est['t_binedges']
-
             # Select window to estimate background using box-selection GUI or typing in values.
             while True:
                 show_hg = input('\nShow histogram to estimate background? (Y/N)')
 
                 # Rectangle selection GUI for window
                 if (show_hg == 'Y') or (show_hg == 'y'):
+                    # Load histogram that includes background signal
+                    histogram_results_bg_est = loader.gen_histogram()
+                    flux_raw_bg_est = histogram_results_bg_est['flux_raw']
+                    r_binedges_bg_est = histogram_results_bg_est['r_binedges']
+                    t_binedges_bg_est = histogram_results_bg_est['t_binedges']
+
                     selected_region = self.plot_bg_est(flux_raw_bg_est, t_binedges_bg_est, r_binedges_bg_est, loader)
 
                     min_r_bg, max_r_bg = selected_region['y0'], selected_region['y1']  # [km]
@@ -242,6 +244,13 @@ class DeadtimeCorrect:
 
                     min_r_bg, max_r_bg = map(float, bg_ranges.split(","))  # [km]
                     min_t_bg, max_t_bg = map(float, bg_times.split(","))  # [s]
+                    loader.xlim = [min_t_bg, max_t_bg]
+                    loader.ylim = [min_r_bg, max_r_bg]
+
+                    histogram_results_bg_est = loader.gen_histogram()
+                    flux_raw_bg_est = histogram_results_bg_est['flux_raw']
+                    r_binedges_bg_est = histogram_results_bg_est['r_binedges']
+                    t_binedges_bg_est = histogram_results_bg_est['t_binedges']
                     break
                 else:
                     print('Please input "Y" or "N".')
