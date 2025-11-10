@@ -18,14 +18,6 @@ class DataPreprocessor:
         self.processor = DataProcessor(config)
 
         self.config = config
-
-    def switch_channel(self):
-        """
-        Switch loader from high- to low-gain channel
-        """
-        self.loader = DataLoader(self.config)
-        self.loader.fname = re.sub(r'/Dev_(\d)_-', lambda m: f"/Dev_{1 - int(m.group(1))}_-", self.loader.fname)
-        self.loader.preprocess()
         
     def run(self):
         self.loader.preprocess()
@@ -46,4 +38,12 @@ class DataPreprocessor:
                 self.plotter.plot_histogram(histogram_results, self.loader)
             else:
                 self.plotter.plot_scatter(self.loader)
+
+    def switch_channel(self):
+        """
+        Switch loader from high- to low-gain channel
+        """
+        self.loader = DataLoader(self.config)
+        self.loader.fname = re.sub(r'/Dev_(\d)_-', lambda m: f"/Dev_{1 - int(m.group(1))}_-", self.loader.fname)
+        self.loader.preprocess()
 

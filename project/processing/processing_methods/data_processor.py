@@ -24,8 +24,10 @@ class DataProcessor:
 
         return fluxes_bg_sub
     
-    def repeat_process(self, loader, plotter, deadtime_correct):
+    def repeat_process(self, loader, plotter, deadtime_correct, num_seq):
         """
         Placeholder for data processing methods without corrections.
         """
-        pass
+        for i in range(num_seq):
+
+            self.corrections_process(loader, plotter, deadtime_correct)

@@ -368,8 +368,9 @@ class DataLoader:
         netCDF file chunks. To load these variables, it's important to load chunks and store values as class properties
         for future handling.
         """
-        tmin = self.xlim[0]  # [s]
-        tmax = self.xlim[1]  # [s]
+        # Only load chunks that fall within specified time window. Else load over the entire time range.
+        tmin = self.xlim[0] if self.load_xlim else 0  # [s]
+        tmax = self.xlim[1] if self.load_xlim else np.inf  # [s]
 
         # Set tmin to first shot time if minimum value is 0
         tmin = 1 / self.PRF if tmin == 0 else tmin

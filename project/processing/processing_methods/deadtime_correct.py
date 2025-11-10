@@ -69,10 +69,12 @@ class DeadtimeCorrect:
                          )
         ax = fig.add_subplot(111)
         colors = ['C0', 'C1', 'C2']
-        for i in range(len(d_olap[0, :])):
-            ax.plot(d_olap[:, i], r_centers / 1e3, '-', color=colors[0], alpha=0.25)
-            # ax.plot(d_olap_m[:, i], r_centers / 1e3, '-', color=colors[1], alpha=0.25)
-            ax.plot(d_olap_dc[:, i], r_centers / 1e3, '-', color=colors[2], alpha=0.25)
+        num_iter = len(d_olap[0, :])
+        alpha = 0.25 if num_iter > 1 else 1.0
+        for i in range(num_iter):
+            ax.plot(d_olap[:, i], r_centers / 1e3, '-', color=colors[0], alpha=alpha)
+            # ax.plot(d_olap_m[:, i], r_centers / 1e3, '-', color=colors[1], alpha=alpha)
+            ax.plot(d_olap_dc[:, i], r_centers / 1e3, '-', color=colors[2], alpha=alpha)
         ax.set_ylabel('Range [km]')
         ax.set_xlabel('Differential Overlap (HG/LG)')
         start_time = t_binedges[0]  # time offset from timestamp

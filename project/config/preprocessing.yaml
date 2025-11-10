@@ -11,12 +11,11 @@ system_params:
 
 file_params:
   date: '/20250913'  # YYYYMMDD. Will search for and save files in the identically named directories. 
-  # date: '/Timing and Range Tests/range_test'
   data_dir_win: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   data_dir_lin: '/home/grki4829/Data'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-09-13_22.36.08.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-09-13_22.16.13.ARSENL'  # main data file name
 
 # Set "apply_corrections" TRUE to compute overlap function and/or deadtime correct. Set to FALSE to plot histogram or scatter plot.
 process_params:
@@ -24,8 +23,7 @@ process_params:
   load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
-  apply_corrections: True  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram. 
-  # estimate_deadtime: False  # Set TRUE to measure deadtime from dataset and apply to deadtime corrections
+  apply_corrections: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram.
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
   fractional_bin: True  # Set TRUE if using fractional binning in range. FALSE will use final histogram resolution when calculating AF. 
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
@@ -34,18 +32,18 @@ process_params:
 plot_params:
   plot_ylim: True  # Set TRUE to limit vertical range when plotting
   plot_xlim: True  # Set TRUE to limit horizontal range when plotting
-  histogram: True  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 120   # [s] temporal bin size
+  tbinsize: 110   # [s] temporal bin size
   rbinsize: 1   # [m] range bin size
-  ylim: [2.0, 2.06]  # [km] excluding last value if histogram
+  ylim: [2.8, 3.4]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [50, 170.1]  # [s] excluding last value if histogram
+  xlim: [0, 230]  # [s] excluding last value if histogram
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 4]   # figure size in inches
-  dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.0001    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot
