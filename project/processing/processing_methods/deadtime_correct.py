@@ -34,7 +34,8 @@ class DeadtimeCorrect:
         # Plot params
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
         self.tbinsize = config['plot_params']['tbinsize']  # [s] time bin size
-
+        self.dpi = config['plot_params']['dpi']  # dots-per-inch
+        self.figsize = config['plot_params']['figsize']  # figure size in inches
 
     def plot_diff_overlap(self, fluxes_bg_sub_hg, fluxes_bg_sub_lg, loader):
         flux_bg_sub_hg = fluxes_bg_sub_hg['flux_bg_sub']  # [Hz]
@@ -64,8 +65,8 @@ class DeadtimeCorrect:
 
         rbinsize = r_binedges[1] - r_binedges[0]  # [m]
         r_centers = r_binedges[:-1] + (rbinsize / 2)  # [m]
-        fig = plt.figure(dpi=400,
-                         figsize=(10, 5)
+        fig = plt.figure(dpi=self.dpi,
+                         figsize=(self.figsize[0], self.figsize[1])
                          )
         ax = fig.add_subplot(111)
         colors = ['C0', 'C1', 'C2']
@@ -90,8 +91,8 @@ class DeadtimeCorrect:
         plt.tight_layout()
         plt.show()
 
-        fig = plt.figure(dpi=400,
-                         figsize=(10, 5),
+        fig = plt.figure(dpi=self.dpi,
+                         figsize=(self.figsize[0], self.figsize[1]),
                          constrained_layout=True
                          )
         ax1 = fig.add_subplot(131)
@@ -134,8 +135,8 @@ class DeadtimeCorrect:
         [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
         plt.show()
 
-        fig = plt.figure(dpi=400,
-                         figsize=(10, 5),
+        fig = plt.figure(dpi=self.dpi,
+                         figsize=(self.figsize[0], self.figsize[1]),
                          constrained_layout=True
                          )
         ax1 = fig.add_subplot(131)
@@ -346,8 +347,8 @@ class DeadtimeCorrect:
         # Plot inter-arrival time histogram
         xmax = deadtime_estimate * 1e9  # [ns]
         ymax = np.max(cnts)
-        fig = plt.figure(dpi=400,
-                         figsize=(4, 3)
+        fig = plt.figure(dpi=self.dpi,
+                         figsize=(self.figsize[0], self.figsize[1])
                          )
         ax = fig.add_subplot(111)
         ax.bar(bin_centers * 1e9, cnts,
@@ -414,8 +415,8 @@ class DeadtimeCorrect:
                                    (hist_t_binedges[-1] + (tbinsize / 2))  # [s]
             extent_r0, extent_r1 = (hist_r_binedges[K] / 1e3), \
                                    (hist_r_binedges[-1] / 1e3)  # [m]
-            fig = plt.figure(figsize=(8, 4),
-                             dpi=400
+            fig = plt.figure(figsize=(self.figsize[0], self.figsize[1]),
+                             dpi=self.dpi
                              )
             ax = fig.add_subplot(111)
             im = ax.imshow(af_hist,
@@ -443,8 +444,8 @@ class DeadtimeCorrect:
     def plot_bg_est(self, flux, t_binedges, r_binedges, loader):
         onselect, selected_region = self.selector_callback()
 
-        fig = plt.figure(dpi=400,
-                         figsize=(10, 5))
+        fig = plt.figure(dpi=self.dpi,
+                         figsize=(self.figsize[0], self.figsize[1]))
         ax = fig.add_subplot(111)
         mesh = ax.pcolormesh(t_binedges,
                              r_binedges / 1e3,
@@ -495,8 +496,8 @@ class DeadtimeCorrect:
 
         # If single profile, then plot it.
         if af_hist.shape[1] == 1:
-            fig = plt.figure(dpi=400,
-                             figsize=(10, 5)
+            fig = plt.figure(dpi=self.dpi,
+                             figsize=(self.figsize[0], self.figsize[1])
                              )
             ax = fig.add_subplot(111)
             rcenters = r_binedges[:-1] - (r_binedges[1] - r_binedges[0]) / 2  # [m]
@@ -544,8 +545,8 @@ class DeadtimeCorrect:
         vmin = np.nanmin(flux_raw[flux_raw > 0]) / 1e6
         vmax = max(np.nanmax(flux_dc), np.nanmax(flux_m)) / 1e6
 
-        fig = plt.figure(dpi=400,
-                         figsize=(10, 5),
+        fig = plt.figure(dpi=self.dpi,
+                         figsize=(self.figsize[0], self.figsize[1]),
                          constrained_layout=True
                          )
         ax1 = fig.add_subplot(131)
