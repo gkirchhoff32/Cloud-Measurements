@@ -15,7 +15,7 @@ file_params:
   data_dir_lin: '/data/grki4829/CoBaLT'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-12-02_20.22.04.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-12-02_22.05.39.ARSENL'  # main data file name
 
 # Set "apply_corrections" TRUE to compute overlap function and/or deadtime correct. Set to FALSE to plot histogram or scatter plot.
 process_params:
@@ -30,20 +30,20 @@ process_params:
   bg_sub: True  # Set TRUE to background subtract. Set FALSE to skip. 
 
 plot_params:
-  plot_ylim: True  # Set TRUE to limit vertical range when plotting
+  plot_ylim: False  # Set TRUE to limit vertical range when plotting
   plot_xlim: False  # Set TRUE to limit horizontal range when plotting
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting
   save_img: True  # Set TRUE to save figure out to image directory.
 
   tbinsize: 0.075   # [s] temporal bin size
   rbinsize: 0.45   # [m] range bin size
-  ylim: [0, 3.0]  # [km] excluding last value if histogram
+  ylim: [0.184, 0.191]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [24.25, 24.75]  # [s] excluding last value if histogram
+  xlim: [130, 165]  # [s] excluding last value if histogram
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [8, 6]   # figure size in inches
-  dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.5    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot
