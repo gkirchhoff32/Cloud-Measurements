@@ -449,7 +449,7 @@ class DataLoader:
 
         # Convert to datetime if useful
         self.timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
-        print("Measurement time: {}".format(self.timestamp))
+        print("Measurement time (behind 1 hour): {}".format(self.timestamp))
 
     def calc_bg(self, flux, rbins, tbins, bg_r_edges, bg_t_edges):
         # Estimate background flux
