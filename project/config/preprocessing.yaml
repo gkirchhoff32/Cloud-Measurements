@@ -10,12 +10,12 @@ system_params:
   pulse_width: 750.0e-12       # [s] Laser-pulse full-width half-maximum length
 
 file_params:
-  date: '/20250913'  # YYYYMMDD. Will search for and save files in the identically named directories.
+  date: '/20251202'  # YYYYMMDD. Will search for and save files in the identically named directories.
   data_dir_win: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
   data_dir_lin: '/data/grki4829/CoBaLT'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2025-09-13_22.52.22.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2025-12-02_20.22.04.ARSENL'  # main data file name
 
 # Set "apply_corrections" TRUE to compute overlap function and/or deadtime correct. Set to FALSE to plot histogram or scatter plot.
 process_params:
@@ -37,10 +37,10 @@ plot_params:
 
   tbinsize: 0.075   # [s] temporal bin size
   rbinsize: 0.45   # [m] range bin size
-  ylim: [0, 2.5]  # [km] excluding last value if histogram
+  ylim: [0, 3]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [1250, 1765]  # [s] excluding last value if histogram
+  xlim: [0, 30]  # [s] excluding last value if histogram
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
