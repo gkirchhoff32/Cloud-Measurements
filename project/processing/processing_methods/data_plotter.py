@@ -113,7 +113,7 @@ class DataPlotter:
         ax.set_xlabel('Time since {}:{}:{} LT [s]'.format(loader.timestamp.hour,
                                                           loader.timestamp.minute,
                                                           loader.timestamp.second)
-                                                          )
+                      )
         ax.set_ylabel('Range [km]')
         ax.set_title(
             'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))

@@ -1,0 +1,49 @@
+constants:
+  c: 299792458  # [m/s] Speed of light
+
+system_params:
+  unwrap_modulo: 33554431    # clock number per rollover (2^25-1)
+  clock_res: 25.0e-12        # clock resolution
+  PRF: 14200                 # [Hz] laser repetition rate
+  deadtime_hg: 29.5e-9       # [s] high-gain detector deadtime. will be used if 'estimate_deadtime' is set to FALSE.
+  deadtime_lg: 31.8e-9       # [s] low-gain detector deadtime. will be used if 'estimate_deadtime' is set to FALSE.
+  pulse_width: 750.0e-12       # [s] Laser-pulse full-width half-maximum length
+
+file_params:
+  date: '/20251202'  # YYYYMMDD. Will search for and save files in the identically named directories.
+  data_dir_win: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  data_dir_lin: '/data/grki4829/CoBaLT'  # For arsenl-red linux server
+  preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
+  image_dir: '/images'  # directory where images are saved
+  fname: '/Dev_0_-_2025-12-02_20.22.04.ARSENL'  # main data file name
+
+# Set "apply_corrections" TRUE to compute overlap function and/or deadtime correct. Set to FALSE to plot histogram or scatter plot.
+process_params:
+  load_ylim: True  # Set TRUE to limit vertical range when generating histogram
+  load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
+  time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
+  range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
+  apply_corrections: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram.
+  active_fraction: True  # Set TRUE if calculating active-fraction histogram
+  fractional_bin: True  # Set TRUE if using fractional binning in range. FALSE will use final histogram resolution when calculating AF. 
+  range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
+  bg_sub: True  # Set TRUE to background subtract. Set FALSE to skip. 
+
+plot_params:
+  plot_ylim: True  # Set TRUE to limit vertical range when plotting
+  plot_xlim: True  # Set TRUE to limit horizontal range when plotting
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting
+  save_img: True  # Set TRUE to save figure out to image directory.
+
+  tbinsize: 0.075   # [s] temporal bin size
+  rbinsize: 0.45   # [m] range bin size
+  ylim: [2.0, 2.7]  # [km] excluding last value if histogram
+  # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
+  # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
+  xlim: [3.75, 4.0]  # [s] excluding last value if histogram
+
+  dpi: 400          # set dpi for plotting
+  save_dpi: 400    # set dpi for saved images
+  figsize: [8, 5]   # figure size in inches
+  dot_size: 0.5    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  alpha: 1  # set transparency in scatter plot
