@@ -99,7 +99,8 @@ class DataPlotter:
 
         fig = plt.figure(dpi=self.dpi,
                          figsize=(self.figsize[0],
-                                  self.figsize[1])
+                                  self.figsize[1]),
+                         constrained_layout=True
                          )
         ax = fig.add_subplot(111)
         ax.scatter(shots_time,
@@ -117,7 +118,7 @@ class DataPlotter:
         ax.set_ylabel('Range [km]')
         ax.set_title(
             'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))
-        plt.tight_layout()
+        # plt.tight_layout()
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             print('Starting to save image...')
