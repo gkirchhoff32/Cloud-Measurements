@@ -59,6 +59,8 @@ class DataPlotter:
                              cmap='viridis',
                              norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
                                           vmax=flux_raw.max())
+                             # norm=LogNorm(1e4,
+                             #              7e6)
                              )
         fig.suptitle('CoBaLT Backscatter Flux')
         cbar = fig.colorbar(mesh, ax=ax)
