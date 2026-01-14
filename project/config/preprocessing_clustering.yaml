@@ -37,12 +37,14 @@ plot_params:
 
   tbinsize: 0.075   # [s] temporal bin size
   rbinsize: 0.45   # [m] range bin size
-  ylim: [1.8, 1.82]  # [km] excluding last value if histogram
-#   ylim: [1.8, 1.805]  # [km]
+#   ylim: [1.8, 1.82]  # [km] excluding last value if histogram
+#   ylim: [1.805, 1.8075]  # [km]
+  ylim: [1.8075, 1.81]  # [km]
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
-  xlim: [182, 192]  # [s] excluding last value if histogram
-#   xlim: [187.5, 188.5]  # [s] 
+#   xlim: [182, 192]  # [s] excluding last value if histogram
+#   xlim: [191, 191.5]  # [s]
+  xlim: [187.75, 188.25]  # [s] 
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
