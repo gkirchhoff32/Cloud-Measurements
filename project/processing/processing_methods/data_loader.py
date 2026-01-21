@@ -68,7 +68,7 @@ class DataLoader:
         Assign important variables to xarray Dataset, e.g., "ranges" and "shots time".
         Then convert ".ARSENL" data to netCDF format (".nc") and write out file.
         """
-
+        
         self.data_dir = self.find_data_path(self.data_dir)
 
         # Important file names and paths
@@ -495,6 +495,7 @@ class DataLoader:
             candidate_roots = [
                 Path("F:/"),
                 Path("C:/Users/Grant"),
+                Path("C:/Users/gkirc")
             ]
             
             for root in candidate_roots:

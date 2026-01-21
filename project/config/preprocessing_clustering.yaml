@@ -46,7 +46,7 @@ plot_params:
 #   xlim: [186.75, 189.25]  # [s] 
 
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
-  ylim: [0.5, 2.15]  # [km]
+  ylim: [2, 2.02]  # [km]
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
 
   xlim: [0, 10]  # [s]
