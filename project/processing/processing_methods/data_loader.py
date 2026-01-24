@@ -68,7 +68,14 @@ class DataLoader:
         Assign important variables to xarray Dataset, e.g., "ranges" and "shots time".
         Then convert ".ARSENL" data to netCDF format (".nc") and write out file.
         """
-        
+
+        date_str = self.date.lstrip('/')
+        current = datetime.strptime(date_str, "%Y%m%d")
+        threshold = datetime.strptime("2025-09-13", "%Y-%m-%d")
+
+        # Compare
+        self.time_delay_correct = False if (current < threshold) else True
+
         self.data_dir = self.find_data_path(self.data_dir)
 
         # Important file names and paths
