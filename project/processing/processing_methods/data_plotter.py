@@ -65,14 +65,14 @@ class DataPlotter:
         fig.suptitle('CoBaLT Backscatter Flux')
         cbar = fig.colorbar(mesh, ax=ax)
         cbar.set_label('Flux [Hz]')
-        ax.set_xlabel('Time since {}:{}:{} LT [s]'.format(loader.timestamp.hour,
-                                                          loader.timestamp.minute,
-                                                          loader.timestamp.second)
-                      )
+        ax.set_xlabel(loader.timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
         ax.set_ylabel('Range [km]')
-        ax.set_title('Scale {:.1f} m x {:.2f} s\n{} {}'.format(self.rbinsize, self.tbinsize,
-                                                               "Low Gain" if loader.low_gain else "High Gain",
-                                                               loader.timestamp))
+        ax.set_title(
+            loader.timestamp.strftime(
+                "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format(
+                    "Low Gain" if loader.low_gain else "High Gain")
+            )
+        )
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
             [0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
@@ -113,14 +113,13 @@ class DataPlotter:
                    )
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim([0, self.c / 2 / self.PRF / 1e3])
         ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
-        ax.set_xlabel('Time since {}:{}:{} LT [s]'.format(loader.timestamp.hour,
-                                                          loader.timestamp.minute,
-                                                          loader.timestamp.second)
-                      )
+        ax.set_xlabel(loader.timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
         ax.set_ylabel('Range [km]')
         ax.set_title(
-            'CoBaLT Backscatter\n{} {}'.format("Low Gain" if loader.low_gain else "High Gain", loader.timestamp))
-        # plt.tight_layout()
+            loader.timestamp.strftime(
+                "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if loader.low_gain else "High Gain")
+            )
+        )
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             print('Starting to save image...')

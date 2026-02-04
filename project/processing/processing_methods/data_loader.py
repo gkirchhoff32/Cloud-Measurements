@@ -6,7 +6,9 @@ import xarray as xr
 import os
 import glob
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 
 # TODO: Automatically detect relevant chunk to load
 # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
@@ -455,8 +457,7 @@ class DataLoader:
         self.low_gain = True if dev == "1" else False
 
         # Convert to datetime if useful
-        self.timestamp = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
-        print("Measurement time (behind 1 hour if outside Daylight Savings): {}".format(self.timestamp))
+        self.timestamp = self.adjust_daylight_savings(date_str, time_str)
 
     def calc_bg(self, flux, rbins, tbins, bg_r_edges, bg_t_edges):
         # Estimate background flux
@@ -468,6 +469,25 @@ class DataLoader:
             bg_flux = 0  # [Hz]
 
         return bg_flux
+
+    @staticmethod
+    def adjust_daylight_savings(date_str, time_str):
+        # Parse your timestamp
+        ts = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
+
+        # Attach the local timezone (example: Mountain Time)
+        local = ZoneInfo("America/Denver")
+        ts_local = ts.replace(tzinfo=local)
+
+        # If DST is not active, add one hour
+        if ts_local.dst() == timedelta(0):
+            ts_local += timedelta(hours=1)
+
+        timestamp = ts_local
+        print(timestamp.strftime("%Y-%m-%d %H:%M:%S %Z (UTC%z)"))
+
+        return timestamp
+
 
     @staticmethod
     def get_unique_filename(filename):
