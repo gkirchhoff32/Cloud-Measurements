@@ -59,12 +59,12 @@ class DataPlotter:
                              r_binedges / 1e3,
                              flux_raw,
                              cmap='viridis',
-                             norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
-                                          vmax=flux_raw.max())
-                             # norm=LogNorm(1e4,
-                             #              7e6)
+                             # norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
+                             #              vmax=flux_raw.max())
+                             norm=LogNorm(2e5,
+                                          2e9)
                              )
-        fig.suptitle('CoBaLT Backscatter Flux')
+        # fig.suptitle('CoBaLT Backscatter Flux')
         cbar = fig.colorbar(mesh, ax=ax)
         cbar.set_label('Flux [Hz]')
         ax.set_xlabel(loader.timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
