@@ -20,7 +20,8 @@ class DataProcessor:
         deadtime_bg_results = deadtime_correct.deadtime_bg_calc(loader, plotter)
 
         # Compare corrections
-        fluxes_bg_sub = deadtime_correct.plot_binwise_corrections(mueller_results, dc_results, deadtime_bg_results)
+        fluxes_bg_sub = deadtime_correct.plot_binwise_corrections(mueller_results, dc_results,
+                                                                  deadtime_bg_results, loader)
 
         return fluxes_bg_sub
     

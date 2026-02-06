@@ -44,6 +44,8 @@ class DataPlotter:
         flux_raw = histogram_results['flux_raw']
         t_binedges = histogram_results['t_binedges']  # [s] temporal bin edges
         r_binedges = histogram_results['r_binedges']  # [m] range bin edges
+        dt = t_binedges[1] - t_binedges[0]  # [s]
+        dr = r_binedges[1] - r_binedges[0]  # [m]
 
         # Start plotting
         print('\nStarting to generate histogram plot...')
@@ -69,8 +71,8 @@ class DataPlotter:
         ax.set_ylabel('Range [km]')
         ax.set_title(
             loader.timestamp.strftime(
-                "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format(
-                    "Low Gain" if loader.low_gain else "High Gain")
+                "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)\n{:.2e} m x {:.2e} s".format(
+                    "Low Gain" if loader.low_gain else "High Gain", dr, dt)
             )
         )
         ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(

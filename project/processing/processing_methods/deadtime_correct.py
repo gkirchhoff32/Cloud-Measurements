@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from matplotlib.widgets import RectangleSelector
 from scipy.signal import fftconvolve
+from pathlib import Path
 from scipy.optimize import least_squares
 
 # TODO: create non-fractional binning mode in addition to fractional binning
@@ -28,7 +29,8 @@ class DeadtimeCorrect:
         self.pulse_width = config['system_params']['pulse_width']  # [s] FWHM
 
         # Process Params
-        self.apply_corrections = config['process_params']['apply_corrections']  # TRUE value applies Mueller Correction
+        self.apply_corrections = config['process_params']['apply_corrections']  # TRUE value applies deadtime corrections
+        self.diff_overlap = config['process_params']['diff_overlap']  # TRUE value calculates differential overlap
         self.active_fraction = config['process_params']['active_fraction']  # TRUE value applies active-fraction calculation
 
         # Plot params
@@ -518,7 +520,7 @@ class DeadtimeCorrect:
             't_binedges': t_binedges
         }
 
-    def plot_binwise_corrections(self, mueller_results, dc_results, deadtime_bg_results):
+    def plot_binwise_corrections(self, mueller_results, dc_results, deadtime_bg_results, loader):
         """
         Plot raw data, Mueller, and deadtime-model corrections to compare.
         """
@@ -542,8 +544,11 @@ class DeadtimeCorrect:
         flux_m -= bg_flux_mueller  # [Hz]
         flux_dc -= bg_flux_mueller  # [Hz]
 
+        # TODO: Dig into this. Seems like at ultra-high resolutions, the flux histograms produce negatives?
         vmin = np.nanmin(flux_raw[flux_raw > 0]) / 1e6
-        vmax = max(np.nanmax(flux_dc), np.nanmax(flux_m)) / 1e6
+        mask_inf_dc = np.isfinite(flux_dc) & (flux_dc <= 40e9)  # mask to remove infinite values and anything too large
+        mask_inf_m = np.isfinite(flux_m)  # mask to remove infinite values
+        vmax = max(np.nanmax(flux_dc[mask_inf_dc]), np.nanmax(flux_m[mask_inf_m])) / 1e6
 
         fig = plt.figure(dpi=self.dpi,
                          figsize=(self.figsize[0], self.figsize[1]),
@@ -590,6 +595,11 @@ class DeadtimeCorrect:
                             pad=0.15)
         cbar.set_label('Flux [MHz]')
         [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2, ax3]]
+        if loader.save_img:
+            img_fname = loader.generic_fname + '_hg' + '.png'
+            loader.img_save_path = Path(loader.data_dir + loader.image_dir + loader.date + r'/compare_corrections') / img_fname
+            fname = loader.get_unique_filename(loader.img_save_path)
+            fig.savefig(fname, dpi=loader.save_dpi)
         plt.show()
 
         return {

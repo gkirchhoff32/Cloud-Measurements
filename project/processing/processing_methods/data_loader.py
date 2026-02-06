@@ -63,6 +63,8 @@ class DataLoader:
         self.xlim = config['plot_params']['xlim']  # [s] x-axis limits
         self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
+        self.save_img = config['plot_params']['save_img']  # set TRUE to save image file
+        self.save_dpi = config['plot_params']['save_dpi']  # output dpi for save file
 
     def preprocess(self):
         """

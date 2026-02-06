@@ -22,16 +22,20 @@ class DataPreprocessor:
     def run(self):
         self.loader.preprocess()
         if self.deadtime_correct.apply_corrections:
-            fluxes_bg_sub_hg = self.processor.corrections_process(self.loader, self.plotter, self.deadtime_correct)
-            self.switch_channel()
-            fluxes_bg_sub_lg = self.processor.corrections_process(self.loader, self.plotter, self.deadtime_correct)
+            if self.deadtime_correct.diff_overlap:
+                fluxes_bg_sub_hg = self.processor.corrections_process(self.loader, self.plotter, self.deadtime_correct)
+                self.switch_channel()
+                fluxes_bg_sub_lg = self.processor.corrections_process(self.loader, self.plotter, self.deadtime_correct)
 
-            # Load both channels now
-            overlap_results = self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg, self.loader)
-            # r_binedges = overlap_results['r_binedges']
-            # dr = r_binedges[1] - r_binedges[0]  # [m]
-            # r_centers = r_binedges[:-1] + (dr / 2)  # [m]
-            # self.deadtime_correct.parametric_fit(r_centers, overlap_results['d_olap_dc'])
+                # Load both channels
+                overlap_results = self.deadtime_correct.plot_diff_overlap(fluxes_bg_sub_hg, fluxes_bg_sub_lg, self.loader)
+                # r_binedges = overlap_results['r_binedges']
+                # dr = r_binedges[1] - r_binedges[0]  # [m]
+                # r_centers = r_binedges[:-1] + (dr / 2)  # [m]
+                # self.deadtime_correct.parametric_fit(r_centers, overlap_results['d_olap_dc'])
+            else:
+                fluxes_bg_sub = self.processor.corrections_process(self.loader, self.plotter, self.deadtime_correct)
+                quit()
         else:
             if self.plotter.histogram:
                 histogram_results = self.loader.gen_histogram()
