@@ -29,7 +29,7 @@ class DeadtimeCorrect:
         self.pulse_width = config['system_params']['pulse_width']  # [s] FWHM
 
         # Process Params
-        self.apply_corrections = config['process_params']['apply_corrections']  # TRUE value applies deadtime corrections
+        self.apply_bin_corrections = config['process_params']['apply_bin_corrections']  # TRUE value applies deadtime corrections
         self.diff_overlap = config['process_params']['diff_overlap']  # TRUE value calculates differential overlap
         self.active_fraction = config['process_params']['active_fraction']  # TRUE value applies active-fraction calculation
 

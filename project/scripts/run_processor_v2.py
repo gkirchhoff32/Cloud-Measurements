@@ -15,7 +15,8 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root)) 
 
-from processing.data_preprocessor_v2 import DataPreprocessor
+from processing.data_preprocessor_v2 import Preprocessor
+from processing.data_processor import Processor
 
 def main():
     """
@@ -25,9 +26,10 @@ def main():
     with open(config_path) as f:
         config = yaml.safe_load(f)
 
-    dp = DataPreprocessor(config)
-    dp.run()
-
+    dpp = Preprocessor(config)
+    dpp.run()
+    dp = Processor(config)
+    dp.run(dpp)
 
 if __name__ == '__main__':
     main()

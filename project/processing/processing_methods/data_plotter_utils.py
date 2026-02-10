@@ -26,7 +26,8 @@ class DataPlotter:
         self.figsize = config['plot_params']['figsize']  # figure size in inches
         self.ylim = config['plot_params']['ylim']  # [km] y-axis limits
         self.xlim = config['plot_params']['xlim']  # [s] x-axis limits
-        self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE, else scatter plot
+        self.histogram = config['plot_params']['histogram']  # Plot histogram if TRUE
+        self.scatter = config['plot_params']['scatter']  # Plot scatter if TRUE
         self.save_img = config['plot_params']['save_img']  # Save images if TRUE
         self.save_dpi = config['plot_params']['save_dpi']  # DPI for saved images
         self.dot_size = config['plot_params']['dot_size']  # Dot size for 'axes.scatter' 's' param
@@ -59,10 +60,10 @@ class DataPlotter:
                              r_binedges / 1e3,
                              flux_raw,
                              cmap='viridis',
-                             # norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
-                             #              vmax=flux_raw.max())
-                             norm=LogNorm(2e5,
-                                          2e9)
+                             norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
+                                          vmax=flux_raw.max())
+                             # norm=LogNorm(2e5,
+                             #              2e9)
                              )
         # fig.suptitle('CoBaLT Backscatter Flux')
         cbar = fig.colorbar(mesh, ax=ax)

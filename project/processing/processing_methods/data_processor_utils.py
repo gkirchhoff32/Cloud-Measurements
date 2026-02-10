@@ -1,11 +1,13 @@
-
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+import numpy as np
 
 class DataProcessor:
     def __init__(self, config):
         # Constants
         self.c = config['constants']['c']  # [m/s] speed of light
 
-    def corrections_process(self, loader, plotter, deadtime_correct):
+    def bin_corrections_process(self, loader, plotter, deadtime_correct):
         """
         Process data: Generate histogram --> Mueller correction --> deadtime-model correction --> background correction
         """
