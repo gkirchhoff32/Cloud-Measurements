@@ -52,41 +52,56 @@ class DataPlotter:
         print('\nStarting to generate histogram plot...')
         start = time.time()
 
-        fig = plt.figure(dpi=self.dpi,
+        # plot line graph if histogram is 1D. Heatmap if 2D.
+        if flux_raw.shape[1] == 1:
+            r_centers = r_binedges[:-1] + dr / 2
+
+            fig = plt.figure(dpi=self.dpi,
                          figsize=(self.figsize[0], self.figsize[1])
                          )
-        ax = fig.add_subplot(111)
-        mesh = ax.pcolormesh(t_binedges,
-                             r_binedges / 1e3,
-                             flux_raw,
-                             cmap='viridis',
-                             norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
-                                          vmax=flux_raw.max())
-                             # norm=LogNorm(2e5,
-                             #              2e9)
+            ax = fig.add_subplot(111)
+            ax.plot(flux_raw, r_centers, '-')
+            ax.set_xlabel('Flux [Hz]')
+            ax.set_ylabel('Range [m]')
+            ax.set_title('Flux Histogram')
+            plt.tight_layout()
+            plt.show()
+        else:
+            fig = plt.figure(dpi=self.dpi,
+                             figsize=(self.figsize[0], self.figsize[1])
                              )
-        # fig.suptitle('CoBaLT Backscatter Flux')
-        cbar = fig.colorbar(mesh, ax=ax)
-        cbar.set_label('Flux [Hz]')
-        ax.set_xlabel(loader.timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
-        ax.set_ylabel('Range [km]')
-        ax.set_title(
-            loader.timestamp.strftime(
-                "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)\n{:.2e} m x {:.2e} s".format(
-                    "Low Gain" if loader.low_gain else "High Gain", dr, dt)
+            ax = fig.add_subplot(111)
+            mesh = ax.pcolormesh(t_binedges,
+                                 r_binedges / 1e3,
+                                 flux_raw,
+                                 cmap='viridis',
+                                 norm=LogNorm(vmin=flux_raw[flux_raw > 0].min(),
+                                              vmax=flux_raw.max())
+                                 # norm=LogNorm(2e5,
+                                 #              2e9)
+                                 )
+            # fig.suptitle('CoBaLT Backscatter Flux')
+            cbar = fig.colorbar(mesh, ax=ax)
+            cbar.set_label('Flux [Hz]')
+            ax.set_xlabel(loader.timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
+            ax.set_ylabel('Range [km]')
+            ax.set_title(
+                loader.timestamp.strftime(
+                    "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)\n{:.2e} m x {:.2e} s".format(
+                        "Low Gain" if loader.low_gain else "High Gain", dr, dt)
+                )
             )
-        )
-        ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
-            [0, self.c / 2 / self.PRF / 1e3])
-        ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
-        plt.tight_layout()
-        print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
-        if self.save_img:
-            img_fname = loader.generic_fname + '_hg' + '.png'
-            loader.img_save_path = Path(loader.data_dir + loader.image_dir + loader.date) / img_fname
-            fname = loader.get_unique_filename(loader.img_save_path)
-            fig.savefig(fname, dpi=self.save_dpi)
-        plt.show()
+            ax.set_ylim([self.ylim[0], self.ylim[1]]) if self.plot_ylim else ax.set_ylim(
+                [0, self.c / 2 / self.PRF / 1e3])
+            ax.set_xlim([self.xlim[0], self.xlim[1]]) if self.plot_xlim else None
+            plt.tight_layout()
+            print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
+            if self.save_img:
+                img_fname = loader.generic_fname + '_hg' + '.png'
+                loader.img_save_path = Path(loader.data_dir + loader.image_dir + loader.date) / img_fname
+                fname = loader.get_unique_filename(loader.img_save_path)
+                fig.savefig(fname, dpi=self.save_dpi)
+            plt.show()
 
     def plot_scatter(self, loader):
         """

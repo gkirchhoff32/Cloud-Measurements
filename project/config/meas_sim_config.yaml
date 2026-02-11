@@ -8,7 +8,7 @@ constants:
   h: 6.626e-34  # [J s] Planck's constant
 
 params:
-  L: 9e-3  # [K/km] Temperature lapse rate for Denver
+  L: 9.0e-3  # [K/km] Temperature lapse rate for Denver
   P_0: 840  # [mbar] Typical absolute pressure for Denver
   T_0: 294.3  # [K] Typical 70 F temperature for Denver
   lamb: 532.18e-9  # [m] laser wavelength
@@ -16,11 +16,11 @@ params:
   D: 8  # [in] outer diameter of telescope
   d: 1.8  # [in] inner diameter of telescope
 
-  dt_TCSPC: 25e-12  # [s] native resolution of TCSPC
+  dt_TCSPC: 25.0e-12  # [s] native resolution of TCSPC
 
   # Laser specs
-  P_L: 35e-3  # [W] average laser power
-  dt_L: 700e-12  # [s] laser pulse FWHM
+  P_L: 35.0e-3  # [W] average laser power
+  dt_L: 700.0e-12  # [s] laser pulse FWHM
   f_L: 14.7e3  # [Hz] rep rate
 
   # Receiver specs (at 532 nm)

@@ -51,7 +51,6 @@ class DataLoader:
         self.fname = config['file_params']['fname']  # File name of raw data
         self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
         self.image_dir = config['file_params']['image_dir']  # Directory to save images
-        self.date = config['file_params']['date']  # YYYYMMDD: points to identically named directories
         # Choose data directory based on OS
         if os.name == 'nt':  # Windows
             self.data_dir = config['file_params']['data_dir_win']
@@ -72,7 +71,7 @@ class DataLoader:
         Assign important variables to xarray Dataset, e.g., "ranges" and "shots time".
         Then convert ".ARSENL" data to netCDF format (".nc") and write out file.
         """
-
+        print('Measured data to be loaded...')
         date_str = self.date.lstrip('/')
         current = datetime.strptime(date_str, "%Y%m%d")
         threshold = datetime.strptime("2025-09-13", "%Y-%m-%d")

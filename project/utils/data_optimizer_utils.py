@@ -166,22 +166,39 @@ def optimize(Y, Z, t, Nshots, num_steps, degree, deadtime, learning_rate, rel_st
 
 
 if __name__ == '__main__':
+    use_sim = True
+    c = 299792458  # [m/s]
+
     # Add the project root directory to Python path
     project_root = Path(__file__).resolve().parent.parent
     sys.path.insert(0, str(project_root))
 
     from processing.data_preprocessor_v2 import Preprocessor
     from processing.data_processor import Processor
+    from sims.gen_sim_data import GenerateData
 
-    config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
+    if use_sim:
+        config_path = Path(__file__).resolve().parent.parent / "config" / "sim_deadtime_fitting_config.yaml"
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
 
-    dpp = Preprocessor(config)
-    dpp.run()
-    histogram_results = dpp.loader.gen_histogram()
+        gd = GenerateData(config)
+        dpp = Preprocessor(config)
+        lamb, r = gd.generate_data()
+        histogram_results = gd.load_sim_data()
 
-    flux_vars = data_setup(dpp.loader, dpp.deadtime_correct, histogram_results)
+        flux_vars = data_setup(gd, dpp.deadtime_correct, histogram_results)
+    else:
+        config_path = Path(__file__).resolve().parent.parent / "config" / "preprocessing.yaml"
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+
+        dpp = Preprocessor(config)
+        dpp.run()
+        histogram_results = dpp.loader.gen_histogram()
+
+        flux_vars = data_setup(dpp.loader, dpp.deadtime_correct, histogram_results)
+
     cnts_raw_fine = flux_vars['cnts_raw']
     af_hist_fine = flux_vars['af_hist']
     t_binedges_fine = flux_vars['t_binedges']
@@ -192,17 +209,17 @@ if __name__ == '__main__':
     af_hist = torch.from_numpy(af_hist_fine.sum(axis=1)).float() / num_tbins
     r_binedges = torch.from_numpy(r_binedges_fine).float()
 
-    flux_raw_fine = cnts_raw_fine / np.diff(t_binedges_fine)[0] / 14.3e3 / (np.diff(r_binedges_fine)[0]/3e8*2)
+    flux_raw_fine = cnts_raw_fine / np.diff(t_binedges_fine)[0] / 14.3e3 / (np.diff(r_binedges_fine)[0]/c*2)
 
     rep_rate = 14.3e3  # [Hz]
     t_range = t_binedges_fine[-1] - t_binedges_fine[0]  # [s]
     Nshots = t_range * rep_rate
     r_binsize = torch.diff(r_binedges)[0]  # [m] range bin size in meters
-    r_binsize_t = r_binsize / 3e8 * 2  # [s] range bin size in seconds
+    r_binsize_t = r_binsize / c * 2  # [s] range bin size in seconds
     r_centers = r_binedges[:-1] + r_binsize / 2
-    r_centers_t = r_centers / 3e8 * 2  # [s] convert range to time for optimization
+    r_centers_t = r_centers / c * 2  # [s] convert range to time for optimization
 
-    degree = 8
+    degree = 28
     num_steps = 2000
     lr=1e-1  # Learning rate
     rel_step_lim = 1e-8
@@ -224,6 +241,9 @@ if __name__ == '__main__':
     ax.plot(cnts_raw/r_binsize_t/Nshots/1e6, r_centers/1e3, 'o', alpha=0.5, label='Raw')
     ax.plot(lamb_out_pois/1e6, r_centers/1e3, '-', alpha=0.7, label='Poisson Fit')
     ax.plot(lamb_out_dead/1e6, r_centers/1e3, '-', alpha=0.7, label='Deadtime Fit')
+    if use_sim:
+        ax.plot(lamb/1e6, r/1e3, '-', alpha=0.7, label='Simulated Truth')
+        ax.set_ylim([gd.r_plot_min, gd.r_plot_max])
     # ax.set_xlim([0, 250])
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
@@ -244,15 +264,3 @@ if __name__ == '__main__':
     plt.tight_layout()
     plt.show()
 
-    quit()
-
-
-
-    {'flux_raw': flux_raw,
-     'cnts_raw': cnts_raw,
-     'af_hist': af_hist,
-     't_binedges': t_binedges,
-     'r_binedges': r_binedges
-     }
-
-    # optimize(Y, Z, t)
