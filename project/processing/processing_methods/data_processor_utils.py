@@ -58,7 +58,7 @@ class DataProcessor:
         r_centers = r_binedges[:-1] + r_binsize / 2
         r_centers_t = self.range_to_time(r_centers)  # [s] convert range to time for optimization
 
-        degree = 20
+        degree = 10
         num_steps = 2000
         lr = 1e-1  # Learning rate
         rel_step_lim = 1e-8

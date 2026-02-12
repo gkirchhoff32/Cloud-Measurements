@@ -1,0 +1,26 @@
+# Virtual environments
+arsenl_venv/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDE / editor files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Data in case
+*.nc
+*.ARSENL
+*.png
+*.csv

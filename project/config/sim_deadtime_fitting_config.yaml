@@ -10,6 +10,7 @@ system_params:
   pulse_width: 750.0e-12       # [s] Laser-pulse full-width half-maximum length
 
 file_params:
+  date: None
   data_dir_win: 'OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\deadtime_fitting_tests'
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
@@ -22,6 +23,7 @@ process_params:
   load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
+  perform_corrections: True
   apply_bin_corrections: False  # Set TRUE if user desires to apply standard single-bin corrections (Mueller, instantaneous deadtime model) to histogram. Set FALSE if doing parametric fitting. 
   diff_overlap: False  # Set TRUE if calculating differential overlap 
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
