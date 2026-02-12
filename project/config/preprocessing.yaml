@@ -15,14 +15,15 @@ file_params:
   data_dir_lin: '/data/grki4829/CoBaLT'  # For arsenl-red linux server
   preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
   image_dir: '/images'  # directory where images are saved
-  fname: '/Dev_0_-_2026-02-03_17.29.43.ARSENL'  # main data file name
+  fname: '/Dev_0_-_2026-02-03_17.24.29.ARSENL'  # main data file name
 
 # Set "apply_corrections" TRUE to compute overlap function and/or deadtime correct. Set to FALSE to plot histogram or scatter plot.
 process_params:
-  load_ylim: True  # Set TRUE to limit vertical range when generating histogram
-  load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
+  load_ylim: False  # Set TRUE to limit vertical range when generating histogram
+  load_xlim: False  # Set TRUE to limit horizontal range when generating histogram
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
+  perform_corrections: False  # Set TRUE to activate flux corrections (Processing scripts)
   apply_bin_corrections: False  # Set TRUE if user desires to apply standard single-bin corrections (Mueller, instantaneous deadtime model) to histogram. Set FALSE if doing parametric fitting. 
   diff_overlap: False  # Set TRUE if calculating differential overlap 
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
@@ -31,10 +32,10 @@ process_params:
   bg_sub: True  # Set TRUE to background subtract. Set FALSE to skip. 
 
 plot_params:
-  plot_ylim: True  # Set TRUE to limit vertical range when plotting
-  plot_xlim: True  # Set TRUE to limit horizontal range when plotting
+  plot_ylim: False  # Set TRUE to limit vertical range when plotting
+  plot_xlim: False  # Set TRUE to limit horizontal range when plotting
   histogram: False  # Set TRUE if histogram plotting.
-  scatter: False  # Set TRUE if scatter plotting.
+  scatter: True  # Set TRUE if scatter plotting.
   save_img: True  # Set TRUE to save figure out to image directory.
 
   tbinsize: 0.005   # [s] temporal bin size
@@ -48,5 +49,5 @@ plot_params:
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
   figsize: [6, 4]   # figure size in inches
-  dot_size: 1    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
+  dot_size: 0.001    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot

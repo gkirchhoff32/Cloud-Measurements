@@ -9,17 +9,14 @@ import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from project_v2.physics.channels import is_low_gain
-from project_v2.physics.timing import adjust_daylight_savings
-from project_v2.physics.calibration import calibrate_time
-from project_v2.physics.timing import timestamps_to_ranges
-from project_v2.processing.histogram import generate_histogram
-
+from physics.channels import is_low_gain
+from physics.timing import adjust_daylight_savings
+from physics.calibration import calibrate_time
+from physics.timing import timestamps_to_ranges
 
 # TODO: Automatically detect relevant chunk to load
 # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
 # TODO: fix PRF estimation and use sync timestamps
-
 
 class DataLoader:
     def __init__(self, config):
@@ -188,10 +185,8 @@ class DataLoader:
                 """
 
                 ranges, shots_time, last_sync = timestamps_to_ranges(
-                    sync_times=sync['dtime'].to_numpy(),
-                    detect_times=detect['dtime'].to_numpy(),
-                    sync_indices=sync.index.to_numpy(),
-                    detect_indices=detect.index.to_numpy(),
+                    sync=sync,
+                    detect=detect,
                     last_sync=last_sync,
                     unwrap_modulo=self.unwrap_modulo,
                     clock_res=self.clock_res,
@@ -252,23 +247,69 @@ class DataLoader:
 
         self.deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
 
-        result = generate_histogram(
-            ranges=ranges,
-            shots_time=shots_time,
-            rbinsize=self.rbinsize,
-            tbinsize=self.tbinsize,
-            PRF=self.PRF,
-            c=self.c,
-            load_xlim=self.load_xlim,
-            load_ylim=self.load_ylim,
-            xlim=self.xlim,
-            ylim=self.ylim,
-            active_fraction=self.active_fraction,
-            deadtime=self.deadtime_lg if self.low_gain else self.deadtime_hg,
-            gen_hist_bg=self.gen_hist_bg
-        )
+        dr_af = self.rbinsize  # [m]
+        dt_af = 1 / self.PRF  # [s]
 
-        return result
+        # Round time histogram bin size that factorizes the fine-res bin size
+        t_factor = max(1, round(self.tbinsize / dt_af))
+        tbinsize_close = t_factor * dt_af  # [s]
+        rbinsize = dr_af  # [m]
+
+        # Set time and range windows
+        deadtime_range = self.deadtime * self.c / 2  # [m]
+        if self.load_xlim:
+            min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
+        else:
+            min_time, max_time = shots_time[0], shots_time[-1]  # [s]
+        if self.load_ylim:
+            reduce_min = deadtime_range if self.active_fraction and (deadtime_range >= rbinsize) else 0
+            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
+        else:
+            reduce_min = 0
+            min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
+
+        if self.load_xlim:
+            max_shots_idx = np.argmin(np.abs(shots_time - max_time))
+            min_shots_idx = np.argmin(np.abs(shots_time - min_time))
+            shots_time = shots_time[min_shots_idx:max_shots_idx]
+            ranges = ranges[min_shots_idx:max_shots_idx]
+
+        if self.gen_hist_bg:
+            print('Using approximate resolutions for background estimate: {:.3e} m x {:.3e} s.'.format(rbinsize,
+                                                                                                       tbinsize_close))
+        else:
+            print('Using resolutions: {:.3e} m x {:.3e} s.'.format(rbinsize, tbinsize_close))
+
+        rbinsize = rbinsize
+        tbinsize = tbinsize_close
+        print('Actual range and time bin sizes: {:.3e} m x {:.3e} s'.format(rbinsize, tbinsize))
+
+        if self.gen_hist_bg:
+            print('\nStarting to generate histogram for background estimate...')
+        else:
+            print('\nStarting to generate histogram...')
+
+        start = time.time()
+        tbins = np.arange(shots_time[0], shots_time[-1], tbinsize)  # [s]
+        if self.load_ylim:
+            rbins = np.arange(min_range, max_range + rbinsize, rbinsize)  # [m]
+        else:
+            rbins = np.arange(0, self.c / 2 / self.PRF + rbinsize, rbinsize)  # [m]
+
+        # Generate histogram
+        H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # Generate 2D histogram
+        H = H.T  # flip axes
+        flux = H / (rbinsize / self.c * 2) / (tbinsize * self.PRF)  # [Hz] Backscatter flux
+
+        print('Finished generating histogram.\nTime elapsed: {:.1f} s'.format(time.time() - start))
+
+        return {
+            't_binedges': t_binedges,
+            'r_binedges': r_binedges,
+            'flux_raw': flux,
+            'cnts_raw': H,
+            'reduce_min': reduce_min
+        }
 
     def calibrate_time(self, sync, chunk_trim):
         """
