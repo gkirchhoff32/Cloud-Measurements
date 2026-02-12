@@ -1,18 +1,20 @@
 """
-Script to process data from cloud measurements after preprocessing.
+Script to process data from sims or cloud measurements after preprocessing.
 """
 
-# from processing.processing_methods.data_loader_utils import DataLoader
-# from processing.processing_methods.data_plotter_utils import DataPlotter
 from processing.processing_methods.deadtime_correct_utils import DeadtimeCorrect
 from processing.processing_methods.data_processor_utils import DataProcessor
+from processing.data_preprocessor_v2 import Preprocessor
+from sims.gen_sim_data import GenerateData
 
 class Processor:
-    def __init__(self, config):
+    def __init__(self, config, use_sim, dpp):
         self.deadtime_correct = DeadtimeCorrect(config)
         self.processor = DataProcessor(config)
 
         self.config = config
+        self.use_sim = use_sim
+        self.loader = GenerateData(config) if self.use_sim else dpp.loader
 
     def run(self, dpp):
         if dpp.deadtime_correct.apply_bin_corrections:
@@ -27,10 +29,7 @@ class Processor:
                 # dr = r_binedges[1] - r_binedges[0]  # [m]
                 # r_centers = r_binedges[:-1] + (dr / 2)  # [m]
                 # self.deadtime_correct.parametric_fit(r_centers, overlap_results['d_olap_dc'])
-            else:
-                fluxes_bg_sub = dpp.processor.bin_corrections_process(dpp.loader, dpp.plotter, dpp.deadtime_correct)
-                quit()
         else:
-
-            histogram_results = dpp.loader.gen_histogram()
-            self.processor.deadtime_fit(dpp.loader, dpp.deadtime_correct, histogram_results)
+            histogram_processing_results = self.processor.gen_histogram_processing(self.use_sim, self.loader, dpp)
+            self.processor.generate_fits(self.use_sim, self.loader, dpp, histogram_processing_results)
+            quit()

@@ -21,13 +21,14 @@ class Preprocessor:
 
         self.config = config
         
-    def run(self):
-        self.loader.preprocess()
-        if self.plotter.histogram:
-            histogram_results = self.loader.gen_histogram()
-            self.plotter.plot_histogram(histogram_results, self.loader)
-        elif self.plotter.scatter:
-            self.plotter.plot_scatter(self.loader)
+    def run(self, use_sim):
+        if not use_sim:
+            self.loader.preprocess()
+            if self.plotter.histogram:
+                histogram_results = self.loader.gen_histogram()
+                self.plotter.plot_histogram(histogram_results, self.loader)
+            elif self.plotter.scatter:
+                self.plotter.plot_scatter(self.loader)
 
     def switch_channel(self):
         """

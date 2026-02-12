@@ -9,6 +9,12 @@ import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from project_v2.physics.channels import is_low_gain
+from project_v2.physics.timing import adjust_daylight_savings
+from project_v2.physics.calibration import calibrate_time
+from project_v2.physics.timing import timestamps_to_ranges
+from project_v2.processing.histogram import generate_histogram
+
 
 # TODO: Automatically detect relevant chunk to load
 # TODO: Throw away shots whose interarrival timestamps are not 70us or close to the rollover value
@@ -48,6 +54,7 @@ class DataLoader:
         self.bg_sub = config['process_params']['bg_sub']  # TRUE to background calculate and subtract. FALSE to skip.
 
         # File params
+        self.date = config['file_params']['date']  # Date directory
         self.fname = config['file_params']['fname']  # File name of raw data
         self.preprocessed_dir = config['file_params']['preprocessed_dir']  # Directory to store preprocessing files
         self.image_dir = config['file_params']['image_dir']  # Directory to save images
@@ -136,7 +143,17 @@ class DataLoader:
                 # If this is the first chunk, then remove calibration section from data
                 if chunk_iter == 0:
                     if self.time_delay_correct is True:
-                        chunk_trim, shot_diff = self.calibrate_time(sync, chunk_trim)
+                        chunk_trim, shot_diff = calibrate_time(
+                            sync=sync,
+                            chunk_trim=chunk_trim,
+                            low_gain=self.low_gain,
+                            fname=self.fname,
+                            data_dir=self.data_dir,
+                            date=self.date,
+                            chunksize=self.chunksize,
+                            PRF=self.PRF
+                        )
+
                         input("Calculating time shift between channels. User needs to ensure calibration was conducted "
                               "for this measurement. Press any key to continue...")
                     else:
@@ -170,43 +187,20 @@ class DataLoader:
                 ----------------------------------------------
                 """
 
-                # Detection "times" in clock counts. Note each clock count is equivalent to 25 ps
-                sync_times = sync['dtime']
-                detect_times = detect['dtime']
-
-                counts = np.diff(sync.index) - 1  # Number of detections per pulse (subtract 1 since sync event is
-                # included in 'np.diff' operation)
-                remainder = max(0, detect.index[-1] - sync.index[-1])  # return positive remainder. If negative, there
-                # is zero remainder.
-                counts = np.append(counts, remainder)  # Include last laser shot too
-                sync_ref = np.repeat(sync_times, counts)  # Repeated sync time array that stores the corresponding
-                # timestamp of the laser event. Each element has a corresponding detection event.
-                shots_ref = np.repeat(np.arange(start=last_sync + 1, stop=(last_sync + 1) + len(sync)), counts)
-                last_sync = shots_ref[-1]  # Track last sync event
-                shots_time = shots_ref / self.PRF  # [s] Equivalent time for each shot
-
-                # Convert detection times relative to most recent laser shot timestamps to relative timestamps
-                detect_times_rel = detect_times.to_numpy() - sync_ref.to_numpy()
-
-                # Handle rollover events. Add the clock rollover value to any negative timestamps.
-                # A rollover is where the timestamps cycle back to 1 after the clock has reached 2^25-1.
-                # This is because if detections occurred between a rollover and sync event, then corresponding
-                # "detect_time_rel" element will be negative.
-                rollover_idx = np.where(detect_times_rel < 0)[0]
-                detect_times_rel[rollover_idx] += self.unwrap_modulo
-
-                # Convert to flight times and range
-                flight_times = detect_times_rel * self.clock_res  # [s] counts were in 25-ps increments
-                ranges = flight_times * self.c / 2  # [m]
-
-                # Remove invalid range values
-                r_valid_idx = np.where(ranges <= (self.c / 2 / self.PRF))
-                ranges = ranges[r_valid_idx]
-                shots_time = shots_time[r_valid_idx]
-
-                # Range correct for path-length difference
-                if (self.range_shift_correct is True) and (self.low_gain is False):
-                    ranges += self.range_shift  # [m]
+                ranges, shots_time, last_sync = timestamps_to_ranges(
+                    sync_times=sync['dtime'].to_numpy(),
+                    detect_times=detect['dtime'].to_numpy(),
+                    sync_indices=sync.index.to_numpy(),
+                    detect_indices=detect.index.to_numpy(),
+                    last_sync=last_sync,
+                    unwrap_modulo=self.unwrap_modulo,
+                    clock_res=self.clock_res,
+                    c=self.c,
+                    PRF=self.PRF,
+                    range_shift_correct=self.range_shift_correct,
+                    range_shift=self.range_shift,
+                    low_gain=self.low_gain
+                )
 
                 """ 
                 ---------------------------
@@ -258,68 +252,23 @@ class DataLoader:
 
         self.deadtime = self.deadtime_lg if self.low_gain else self.deadtime_hg
 
-        dr_af = self.rbinsize  # [m]
-        dt_af = 1 / self.PRF  # [s]
+        result = generate_histogram(
+            ranges=ranges,
+            shots_time=shots_time,
+            rbinsize=self.rbinsize,
+            tbinsize=self.tbinsize,
+            PRF=self.PRF,
+            c=self.c,
+            load_xlim=self.load_xlim,
+            load_ylim=self.load_ylim,
+            xlim=self.xlim,
+            ylim=self.ylim,
+            active_fraction=self.active_fraction,
+            deadtime=self.deadtime_lg if self.low_gain else self.deadtime_hg,
+            gen_hist_bg=self.gen_hist_bg
+        )
 
-        # Round time histogram bin size that factorizes the fine-res bin size
-        t_factor = max(1, round(self.tbinsize / dt_af))
-        tbinsize_close = t_factor * dt_af  # [s]
-        rbinsize = dr_af  # [m]
-
-        # Set time and range windows
-        deadtime_range = self.deadtime * self.c / 2  # [m]
-        if self.load_xlim:
-            min_time, max_time = self.xlim[0], self.xlim[1]  # [s]
-        else:
-            min_time, max_time = shots_time[0], shots_time[-1]  # [s]
-        if self.load_ylim:
-            reduce_min = deadtime_range if self.active_fraction and (deadtime_range >= rbinsize) else 0
-            min_range, max_range = (self.ylim[0] * 1e3 - reduce_min), (self.ylim[1] * 1e3)  # [m]
-        else:
-            reduce_min = 0
-            min_range, max_range = 0, (self.c / 2 / self.PRF)  # [m]
-
-        if self.load_xlim:
-            max_shots_idx = np.argmin(np.abs(shots_time - max_time))
-            min_shots_idx = np.argmin(np.abs(shots_time - min_time))
-            shots_time = shots_time[min_shots_idx:max_shots_idx]
-            ranges = ranges[min_shots_idx:max_shots_idx]
-
-        if self.gen_hist_bg:
-            print('Using approximate resolutions for background estimate: {:.3e} m x {:.3e} s.'.format(rbinsize, tbinsize_close))
-        else:
-            print('Using resolutions: {:.3e} m x {:.3e} s.'.format(rbinsize, tbinsize_close))
-
-        self.rbinsize = rbinsize
-        self.tbinsize = tbinsize_close
-        print('Actual range and time bin sizes: {:.3e} m x {:.3e} s'.format(self.rbinsize, self.tbinsize))
-
-        if self.gen_hist_bg:
-            print('\nStarting to generate histogram for background estimate...')
-        else:
-            print('\nStarting to generate histogram...')
-
-        start = time.time()
-        tbins = np.arange(shots_time[0], shots_time[-1], self.tbinsize)  # [s]
-        if self.load_ylim:
-            rbins = np.arange(min_range, max_range + self.rbinsize, self.rbinsize)  # [m]
-        else:
-            rbins = np.arange(0, self.c / 2 / self.PRF + self.rbinsize, self.rbinsize)  # [m]
-
-        # Generate histogram
-        H, t_binedges, r_binedges = np.histogram2d(shots_time, ranges, bins=[tbins, rbins])  # Generate 2D histogram
-        H = H.T  # flip axes
-        flux = H / (self.rbinsize / self.c * 2) / (self.tbinsize * self.PRF)  # [Hz] Backscatter flux
-
-        print('Finished generating histogram.\nTime elapsed: {:.1f} s'.format(time.time() - start))
-
-        return {
-            't_binedges': t_binedges,
-            'r_binedges': r_binedges,
-            'flux_raw': flux,
-            'cnts_raw': H,
-            'reduce_min': reduce_min
-        }
+        return result
 
     def calibrate_time(self, sync, chunk_trim):
         """
@@ -455,10 +404,10 @@ class DataLoader:
 
         # Pull out board number, date, and time.
         dev, date_str, time_str = match.groups()
-        self.low_gain = True if dev == "1" else False
+        self.low_gain = is_low_gain(dev)
 
         # Convert to datetime if useful
-        self.timestamp = self.adjust_daylight_savings(date_str, time_str)
+        self.timestamp = adjust_daylight_savings(date_str, time_str)
 
     def calc_bg(self, flux, rbins, tbins, bg_r_edges, bg_t_edges):
         # Estimate background flux
@@ -470,25 +419,6 @@ class DataLoader:
             bg_flux = 0  # [Hz]
 
         return bg_flux
-
-    @staticmethod
-    def adjust_daylight_savings(date_str, time_str):
-        # Parse your timestamp
-        ts = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H.%M.%S")
-
-        # Attach the local timezone (example: Mountain Time)
-        local = ZoneInfo("America/Denver")
-        ts_local = ts.replace(tzinfo=local)
-
-        # If DST is not active, add one hour
-        if ts_local.dst() == timedelta(0):
-            ts_local += timedelta(hours=1)
-
-        timestamp = ts_local
-        print(timestamp.strftime("%Y-%m-%d %H:%M:%S %Z (UTC%z)"))
-
-        return timestamp
-
 
     @staticmethod
     def get_unique_filename(filename):

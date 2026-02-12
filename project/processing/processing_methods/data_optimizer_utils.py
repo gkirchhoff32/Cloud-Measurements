@@ -21,7 +21,6 @@ class DataOptimizer(torch.nn.Module):
         # Evaluate polynomial
         poly = self.t_cheby @ self.C
         lamb = torch.exp(poly) + self.B
-        # lamb = torch.exp(poly)
 
         return lamb
 
@@ -59,70 +58,6 @@ def condition_domain(t, t_min, t_max, degree):
     t_cheby = cheby_poly(t_scaled, degree)
 
     return t_cheby
-
-def data_setup(loader, deadtime_correct, histogram_results):
-    flux_raw = histogram_results['flux_raw']  # [Hz]
-    cnts_raw = histogram_results['cnts_raw']
-    af_results = deadtime_correct.calc_af_hist_convolution(histogram_results, loader)
-    af_hist = af_results['af_hist']
-
-    deadtime_trim_idx = deadtime_correct.deadtime_trim_idx
-    flux_raw = flux_raw[deadtime_trim_idx:, :]  # [Hz] Removing initial loaded bins for AF hist calculation
-    cnts_raw = cnts_raw[deadtime_trim_idx:, :]  # Removing initial loaded bins for AF hist calculation
-    t_binedges = histogram_results['t_binedges']
-    r_binedges = histogram_results['r_binedges'][deadtime_trim_idx:]
-
-    flux_bin_est = flux_raw / af_hist
-
-    plot_flux_est(flux_raw, flux_bin_est, t_binedges, r_binedges)
-
-    return {'flux_raw': flux_raw,
-            'cnts_raw': cnts_raw,
-            'af_hist': af_hist,
-            't_binedges': t_binedges,
-            'r_binedges': r_binedges
-            }
-
-def plot_flux_est(flux_raw, flux_est, t_binedges, r_binedges):
-    vmin = np.nanmin(flux_raw[flux_raw > 0]) / 1e6
-    # mask_inf_dc = np.isfinite(flux_est) & (flux_est <= 40e16)  # mask to remove infinite values and anything too large
-    mask_inf_dc = np.isfinite(flux_est)  # mask to remove infinite values and anything too large
-    vmax = np.nanmax(flux_est[mask_inf_dc]) / 1e6
-
-    fig = plt.figure(dpi=400,
-                     figsize=(8, 6),
-                     constrained_layout=True
-                     )
-    ax1 = fig.add_subplot(121)
-    ax2 = fig.add_subplot(122)
-    __ = ax1.pcolormesh(t_binedges,
-                        r_binedges / 1e3,
-                        flux_raw / 1e6,
-                        cmap='viridis',
-                        norm=LogNorm(vmin=vmin,
-                                     vmax=vmax
-                                     )
-                        )
-    mesh2 = ax2.pcolormesh(t_binedges,
-                           r_binedges / 1e3,
-                           flux_est / 1e6,
-                           cmap='viridis',
-                           norm=LogNorm(vmin=vmin,
-                                        vmax=vmax
-                                        )
-                           )
-    ax1.set_xlabel('Time [s]')
-    ax1.set_ylabel('Range [km]')
-    ax1.set_title('Raw')
-    ax2.set_xlabel('Time [s]')
-    ax2.set_title('Bin Correction')
-    ax2.tick_params(labelleft=False)
-    cbar = fig.colorbar(mesh2, ax=[ax1, ax2],
-                        location='right',
-                        pad=0.15)
-    cbar.set_label('Flux [MHz]')
-    [plt.setp(ax.get_xticklabels(), rotation=30, horizontalalignment='right') for ax in [ax1, ax2]]
-    plt.show()
 
 def optimize(Y, Z, t, Nshots, num_steps, degree, deadtime, learning_rate, rel_step_lim, max_epochs, term_persist):
     dr_t = torch.diff(t)[0]  # [s] range resolution in time
@@ -215,25 +150,35 @@ if __name__ == '__main__':
     t_range = t_binedges_fine[-1] - t_binedges_fine[0]  # [s]
     Nshots = t_range * rep_rate
     r_binsize = torch.diff(r_binedges)[0]  # [m] range bin size in meters
-    r_binsize_t = r_binsize / c * 2  # [s] range bin size in seconds
+    r_binsize_t = range_to_time(r_binsize)  # [s] range bin size in seconds
     r_centers = r_binedges[:-1] + r_binsize / 2
-    r_centers_t = r_centers / c * 2  # [s] convert range to time for optimization
+    r_centers_t = range_to_time(r_centers)  # [s] convert range to time for optimization
 
-    degree = 28
+    degree = 20
     num_steps = 2000
     lr=1e-1  # Learning rate
     rel_step_lim = 1e-8
     max_epochs = 10000
     term_persist = 20
 
-    lamb_out_dead, model_C_dead, model_B_dead, loss_list_dead = optimize(Y=cnts_raw, Z=af_hist, t=r_centers_t, Nshots=Nshots,
-                                                         num_steps=num_steps, degree=degree, deadtime=True,
-                                                         learning_rate=lr, rel_step_lim=rel_step_lim,
-                                                         max_epochs=max_epochs, term_persist=term_persist)
-    lamb_out_pois, model_C_pois, model_B_pois, loss_list_pois = optimize(Y=cnts_raw, Z=af_hist, t=r_centers_t, Nshots=Nshots,
-                                                         num_steps=num_steps, degree=degree, deadtime=False,
-                                                         learning_rate=lr, rel_step_lim=rel_step_lim,
-                                                         max_epochs=max_epochs, term_persist=term_persist)
+    results = {}
+    for mode in ['deadtime', 'poisson']:
+        results[mode] = optimize(
+            Y=cnts_raw,
+            Z=af_hist,
+            t=r_centers_t,
+            Nshots=Nshots,
+            num_steps=num_steps,
+            degree=degree,
+            deadtime=(mode=="deadtime"),
+            learning_rate=lr,
+            rel_step_lim=rel_step_lim,
+            max_epochs=max_epochs,
+            term_persist=term_persist
+        )
+
+    lamb_out_dead, model_C_dead, model_B_dead, loss_list_dead = results['deadtime']
+    lamb_out_pois, model_C_pois, model_B_pois, loss_list_pois = results['poisson']
     print('Background term: deadtime {:.0f} Hz, poisson {:.0f} Hz'.format(model_B_dead[0], model_B_pois[0]))
 
     fig = plt.figure(dpi=400)
@@ -244,7 +189,6 @@ if __name__ == '__main__':
     if use_sim:
         ax.plot(lamb/1e6, r/1e3, '-', alpha=0.7, label='Simulated Truth')
         ax.set_ylim([gd.r_plot_min, gd.r_plot_max])
-    # ax.set_xlim([0, 250])
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
     ax.set_title('Fit: Degree {}'.format(degree))

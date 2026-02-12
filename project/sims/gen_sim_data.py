@@ -4,31 +4,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import xarray as xr
 from pathlib import Path
-import yaml
 import time
 
 # Add the project root directory to Python path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
 
-cwd = os.getcwd()
-dirLib = cwd + r'/../utils'
-if dirLib not in sys.path:
-    sys.path.append(dirLib)
+dir_lib = Path(__file__).resolve().parent.parent / "utils"
+if str(dir_lib) not in sys.path:
+    sys.path.append(str(dir_lib))
 
 from generate_sim_data_utils import gen_sim_data
-
-# Generate gaussian function
-def gaussian(x, A, mu, sigma, b):
-    return A * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2)) + b
-
-home = str(Path.home())
-save_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\deadtime_fitting_tests\preprocessed_data'
 
 class GenerateData:
     def __init__(self, config):
         self.fname = None
         self.lamb = None
+        self.save_dir = None
 
         self.c = config['constants']['c']  # [m/s] speed of light
         self.deadtime = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
@@ -47,6 +39,8 @@ class GenerateData:
         self.laser_pulse_width = config['sim_params']['laser_pulse_width']  # [s] laser pulse width
         self.wrap_deadtime = False
 
+        self.save_loc = config['file_params']['save_dir']
+
     def generate_data(self):
         r = np.arange(self.r_sim_min*1e3, self.r_sim_max*1e3 + self.rbinsize, self.rbinsize)  # [m] range axis
 
@@ -58,7 +52,7 @@ class GenerateData:
         r_t_min = r_t[0]  # [s] beginning of range window to shift
         r_t_shifted = r_t - r_t_min  # [s] shift the time axis
         mu_t_shifted = mu_t - r_t_min  # [s] shift the center of the Gaussian
-        self.lamb = gaussian(r_t_shifted, self.A, mu_t_shifted, sigma_t, self.b)
+        self.lamb = self.gaussian(r_t_shifted, self.A, mu_t_shifted, sigma_t, self.b)
 
         start = time.time()
         # Generate simulated data
@@ -70,8 +64,6 @@ class GenerateData:
                                    )
         print('Simulated Data generated. Time elapsed: {:.1f} s'.format(time.time() - start))
 
-        time_tag_idx = sim_results['det_idx']  # detected time tag index
-        true_time_tag_idx = sim_results['phot_idx']  # incident photon time tag index
         sync_idx = sim_results['sync_idx']  # laser sync events
         time_tag = sim_results['det_events']  # detection time tags
         true_time_tag = sim_results['phot_events']  # incident photon time tags
@@ -103,14 +95,15 @@ class GenerateData:
 
         self.fname = r'\sim_amp{:.1E}_nshot{:.1E}_width{:.1E}_dt{:.1E}.nc'.format(self.A, self.Nshot,
                                                                              self.laser_pulse_width, dr_t)
-
-        sim_data.to_netcdf(save_dir + self.fname)
+        home = str(Path.home())
+        self.save_dir = home + self.save_loc
+        sim_data.to_netcdf(self.save_dir + self.fname)
 
         return self.lamb, r
 
     def load_sim_data(self):
         # Now load data
-        ds = xr.open_dataset(save_dir + self.fname)
+        ds = xr.open_dataset(self.save_dir + self.fname)
 
         cnts = ds.time_tag
         dt = ds.dt_sim
@@ -147,16 +140,24 @@ class GenerateData:
             'cnts_raw': H
         }
 
+    @staticmethod
+    # Generate gaussian function
+    def gaussian(x, A, mu, sigma, b):
+        return A * np.exp(-(x - mu) ** 2 / (2 * sigma ** 2)) + b
 
-if __name__ == '__main__':
-    # Load sim data config params
-    config_path = Path(__file__).resolve().parent.parent / "config" / "sim_deadtime_fitting_config.yaml"
-    with open(config_path) as f:
-        config = yaml.safe_load(f)
 
-    gd = GenerateData(config)
-    gd.generate_data()
-    histogram_results = gd.load_sim_data()
+# if __name__ == '__main__':
+#     home = str(Path.home())
+#     save_dir = home + r'\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\Sims\deadtime_fitting_tests\preprocessed_data'
+#
+#     # Load sim data config params
+#     config_path = Path(__file__).resolve().parent.parent / "config" / "sim_deadtime_fitting_config.yaml"
+#     with open(config_path) as f:
+#         config = yaml.safe_load(f)
+#
+#     gd = GenerateData(config)
+#     gd.generate_data()
+#     histogram_results = gd.load_sim_data()
 
 
 
