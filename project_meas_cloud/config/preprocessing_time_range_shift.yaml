@@ -1,0 +1,34 @@
+constants:
+  c: 299792458  # [m/s] Speed of light
+
+system_params:
+  unwrap_modulo: 33554431    # clock number per rollover (2^25-1)
+  clock_res: 25.0e-12        # clock resolution
+  PRF: 14200                 # [Hz] laser repetition rate
+
+file_params:
+  date: '/Timing and Range Tests/range_test'
+  # data_dir: 'F:\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'  # Data directory
+  data_dir: 'C:\Users\Grant\OneDrive - UCB-O365\ARSENL\Experiments\Cloud Measurements\First Light'
+  preprocessed_dir: '/preprocessed_data'  # directory where preprocessed data is stored e.g., .pkl, .nc)
+  fname: '/Dev_0_-_2025-09-11_18.06.18.ARSENL'  # main data file name
+
+process_params:
+  time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
+  range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
+  range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
+
+plot_params:
+  histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting 
+  use_ylim: True   # Set TRUE to activate 'axes.set_ylim' parameter and 'ylim' variable 
+  use_xlim: False  # Set TRUE to activate 'axes.set_xlim' parameter and 'xlim' variable
+
+  tbinsize: 1                    # [s] temporal bin size
+  rbinsize: 0.01                  # [m] range bin size
+  ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
+  xlim: [0, 3800]  # [s] 
+  
+  dpi: 400          # set dpi for plotting
+  save_dpi: 400    # set dpi for saved images
+  figsize: [8, 4]   # figure size in inches
+  dot_size: 0.01    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
