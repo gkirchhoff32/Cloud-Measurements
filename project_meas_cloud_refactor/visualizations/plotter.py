@@ -13,6 +13,12 @@ from physics.conversions import time_to_range
 
 class DataPlotter:
     def __init__(self, config):
+        # Constants
+        self.c = config['constants']['c']  # [m/s] speed of light
+
+        # System params
+        self.PRF = config['system_params']['PRF']  # [Hz] laser repetition rate
+
         # Plot params
         self.dpi = config['plot_params']['dpi']  # dots-per-inch
         self.figsize = config['plot_params']['figsize']  # figure size in inches
