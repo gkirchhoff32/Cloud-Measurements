@@ -8,9 +8,12 @@ sys.path.insert(0, str(project_root))
 
 from processing.data_preprocessor import DataPreprocessor
 from io_utils.netCDF_loader import netCDFLoader
-from visualizations.data_plotter import DataPlotter
+from visualizations.plotter import DataPlotter
+from processing.generate_histogram import GenerateHistogram
+from processing.deadtime_processing import DeadtimeProcessing
+from simulation.gen_sim_data import GenerateSimData
 
-use_sim = False
+use_sim = True
 
 def main():
     run()
@@ -25,7 +28,8 @@ def run():
         config = yaml.safe_load(f)
 
     if use_sim:
-        quit()
+        gsd = GenerateSimData(config)
+        gsd.write_sim_data()
     else:
         dpp = DataPreprocessor(config)
         preprocess_path, generic_fname, low_gain, timestamp = dpp.write_ARSENL_netCDF()
@@ -34,7 +38,21 @@ def run():
         ranges, shots_time = ncl.load_chunks(preprocess_path, generic_fname)
 
         dpl = DataPlotter(config)
-        dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+        # dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+
+        gh = GenerateHistogram(config)
+        r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
+
+        dp = DeadtimeProcessing(config)
+        # flux_mueller = dp.mueller_correction(flux, low_gain)
+        dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
+        # flux_bin_est, r_binedges_trim = dp.binwise_correction(flux, r_binedges, t_binedges, H, low_gain)
+        # dpl.plot_histogram(flux_bin_est, t_binedges, r_binedges_trim, timestamp, low_gain, generic_fname)
+
+        dp.deadtime_fitting(H, r_binedges, t_binedges, low_gain)
+
+
+
 
         quit()
 

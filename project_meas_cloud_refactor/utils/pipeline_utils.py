@@ -11,6 +11,8 @@ def identify_tmin_tmax(xlim, load_xlim, PRF):
     return tmin, tmax
 
 def check_overlap(ds, tmin, tmax, chunk, file_path, ranges_tot, shots_time_tot, loaded):
+    covered_start, covered_end = False, False
+
     # Get the first and last time values (assume shots_time is 1D and sorted)
     t0 = ds['shots_time'].isel(shots_time=0).item()
     t1 = ds['shots_time'].isel(shots_time=-1).item()

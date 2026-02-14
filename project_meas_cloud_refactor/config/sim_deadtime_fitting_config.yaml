@@ -5,8 +5,8 @@ system_params:
   unwrap_modulo: 33554431    # clock number per rollover (2^25-1)
   clock_res: 25.0e-12        # clock resolution
   PRF: 14300                 # [Hz] laser repetition rate
-  deadtime_hg: 29.5e-9       # [s] high-gain detector deadtime. will be used if 'estimate_deadtime' is set to FALSE.
-  deadtime_lg: 31.8e-9       # [s] low-gain detector deadtime. will be used if 'estimate_deadtime' is set to FALSE.
+  deadtime: 29.5e-9       # [s] high-gain detector deadtime. will be used if 'estimate_deadtime' is set to FALSE.
+  # deadtime_lg: 31.8e-9       # [s] low-gain detector deadtime. will be used if 'estimate_deadtime' is set to FALSE.
   pulse_width: 750.0e-12       # [s] Laser-pulse full-width half-maximum length
 
 file_params:
@@ -52,7 +52,7 @@ plot_params:
 sim_params:
   sim_ylim: [2.930, 2.939]  # [km] simulated axis (first value must always be zero)
   
-  Nshot: 14300  # number of laser shots
+  Nshot: 143  # number of laser shots
   A: 1.0e+9  # [Hz] Gaussian amplitude flux
   b: 1400  # [Hz] Background flux
   mu: 2.93775e+3  # [m] center of Gaussian 
