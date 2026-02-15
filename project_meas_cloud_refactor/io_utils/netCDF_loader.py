@@ -45,6 +45,7 @@ class netCDFLoader:
         loaded = 0
         ranges_tot = []
         shots_time_tot = []
+        covered_start, covered_end = False, False
         print('Locating and loading relevant netcdf data chunks...')
         for file_path in files:
             # Open metadata only (don't load full data)
@@ -53,7 +54,18 @@ class netCDFLoader:
                 chunk = get_chunk_num(file_path)
 
                 # Check for overlap. Load if it does. Skip if not.
-                result, loaded = check_overlap(ds, tmin, tmax, chunk, file_path, ranges_tot, shots_time_tot, loaded)
+                result, loaded, covered_start, covered_end = check_overlap(
+                    ds,
+                    tmin,
+                    tmax,
+                    chunk,
+                    file_path,
+                    ranges_tot,
+                    shots_time_tot,
+                    loaded,
+                    covered_start,
+                    covered_end
+                )
                 if result == 0:
                     break
 

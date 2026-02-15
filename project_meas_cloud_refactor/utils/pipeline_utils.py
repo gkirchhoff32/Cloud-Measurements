@@ -10,9 +10,7 @@ def identify_tmin_tmax(xlim, load_xlim, PRF):
 
     return tmin, tmax
 
-def check_overlap(ds, tmin, tmax, chunk, file_path, ranges_tot, shots_time_tot, loaded):
-    covered_start, covered_end = False, False
-
+def check_overlap(ds, tmin, tmax, chunk, file_path, ranges_tot, shots_time_tot, loaded, covered_start, covered_end):
     # Get the first and last time values (assume shots_time is 1D and sorted)
     t0 = ds['shots_time'].isel(shots_time=0).item()
     t1 = ds['shots_time'].isel(shots_time=-1).item()
@@ -37,9 +35,9 @@ def check_overlap(ds, tmin, tmax, chunk, file_path, ranges_tot, shots_time_tot, 
         # Stop early if full range is covered
         if covered_start and covered_end:
             print(f'\nFull time range {tmin:.2f}–{tmax:.2f}s covered by loaded chunks.')
-            return 0, loaded
+            return 0, loaded, covered_start, covered_end
         else:
-            return 1, loaded
+            return 1, loaded, covered_start, covered_end
     else:
         print(f'Skipping chunk #{chunk}: {t0:.2f}–{t1:.2f}s not in range {tmin:.2f}–{tmax:.2f}s')
-        return 2, loaded
+        return 2, loaded, covered_start, covered_end
