@@ -55,13 +55,13 @@ class DataPlotter:
                    )
         ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
         ax.set_xlim(self.xlim) if self.plot_xlim else None
-        ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
+        ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
             )
-        )
+        ) if timestamp else ax.set_title('Simulated Backscatter')
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             print('Starting to save image...')
@@ -119,14 +119,14 @@ class DataPlotter:
                                  )
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Flux [Hz]')
-            ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z"))
+            ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
             ax.set_ylabel('Range [km]')
             ax.set_title(
                 timestamp.strftime(
                     "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)\n{:.2e} m x {:.2e} s".format(
                         "Low Gain" if low_gain else "High Gain", dr, dt)
                 )
-            )
+            ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
             plt.tight_layout()

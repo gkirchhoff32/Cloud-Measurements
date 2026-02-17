@@ -19,6 +19,8 @@ def main():
     run()
 
 def run():
+    low_gain = False
+    timestamp = None
     if use_sim:
         config_path = Path(__file__).resolve().parent.parent / "config" / "sim_deadtime_fitting_config.yaml"
     else:
@@ -30,15 +32,29 @@ def run():
     if use_sim:
         gsd = GenerateSimData(config)
         gsd.write_sim_data()
+
+        ncl = netCDFLoader(config, use_sim)
+        ranges, shots_time, generic_fname = ncl.load_sim_data()
     else:
         dpp = DataPreprocessor(config)
         preprocess_path, generic_fname, low_gain, timestamp = dpp.write_ARSENL_netCDF()
 
-        ncl = netCDFLoader(config)
+        ncl = netCDFLoader(config, use_sim)
         ranges, shots_time = ncl.load_chunks(preprocess_path, generic_fname)
 
-        dpl = DataPlotter(config)
-        dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+    gh = GenerateHistogram(config)
+
+    r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
+
+    dpl = DataPlotter(config)
+    dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+    dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
+
+    dp = DeadtimeProcessing(config)
+    dp.deadtime_fitting(H, r_binedges, t_binedges, low_gain)
+
+    # dpl = DataPlotter(config)
+    # dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
 
         # gh = GenerateHistogram(config)
         # r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)

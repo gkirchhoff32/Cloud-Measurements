@@ -16,7 +16,7 @@ class GenerateSimData:
         self.c = config['constants']['c']  # [m/s] speed of light
 
         # System params
-        self.deadtime = config['system_params']['deadtime']  # [s] high-gain detector deadtime
+        self.deadtime = config['system_params']['deadtime_hg']  # [s] high-gain detector deadtime
         self.laser_pulse_width = config['sim_params']['laser_pulse_width']  # [s] laser pulse width
 
         # Simulation params
@@ -35,6 +35,7 @@ class GenerateSimData:
 
         # Save params
         self.save_loc = config['file_params']['save_dir']
+        self.func_shape = config['file_params']['func_shape']
 
     def write_sim_data(self):
         # TODO: CLEAN THIS UP! and continue simulated data loader
@@ -48,7 +49,11 @@ class GenerateSimData:
         r_t_min = r_t[0]  # [s] beginning of range window to shift
         r_t_shifted = r_t - r_t_min  # [s] shift the time axis
         mu_t_shifted = mu_t - r_t_min  # [s] shift the center of the Gaussian
-        lamb = gaussian(r_t_shifted, self.A, mu_t_shifted, sigma_t, self.b)
+        if self.func_shape == 'gaussian':
+            lamb = gaussian(r_t_shifted, self.A, mu_t_shifted, sigma_t, self.b)
+        else:
+            print('Make sure to select appropriate function from physics.math.py module.')
+            raise ValueError
 
         start = time.time()
         # Generate simulated data
@@ -80,24 +85,27 @@ class GenerateSimData:
             true_time_tag_sync_index=(['true_time_tag_index'], true_time_tag_sync_idx),
             laser_pulse_width=self.laser_pulse_width,
             target_time=mu_t,
+            target_sigma=sigma_t,
             target_amplitude=self.A,
             background=self.b,
             dt_sim=dr_t,
-            time_axis=r_t
+            time_axis=r_t,
+            profile=self.func_shape
         ),
             coords=dict(
                 sync_index=(['sync_index'], sync_idx)
             )
         )
 
-        fname = r'\sim_amp{:.1E}_nshot{:.1E}_width{:.1E}_dt{:.1E}.nc'.format(
+        fname = r'\sim_{}_A{:.1E}Hz_mu{:.1f}km_sig{:.1E}m_N{}.nc'.format(
+            self.func_shape,
             self.A,
-            self.Nshot,
-            self.laser_pulse_width,
-            dr_t
+            self.mu/1e3,
+            self.sigma,
+            self.Nshot
         )
         home = str(Path.home())
-        save_dir = home + self.save_loc
+        save_dir = home + self.save_loc + self.func_shape
         sim_data.to_netcdf(save_dir + fname)
 
         return lamb, r

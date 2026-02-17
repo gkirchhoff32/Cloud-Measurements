@@ -48,7 +48,7 @@ class DeadtimeProcessing:
         r_centers_trim = r_binedges[deadtime_trim_idx:-1] + r_binsize / 2  # trimmed to match active-fraction histogram
         r_centers_trim_t = range_to_time(r_centers_trim, self.c)  # [s] convert range to time for optimization
 
-        degree = 10
+        degree = 28
         num_steps = 2000
         lr = 1e-1  # Learning rate
         rel_step_lim = 1e-8
