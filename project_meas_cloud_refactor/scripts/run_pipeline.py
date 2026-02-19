@@ -14,6 +14,7 @@ from processing.deadtime_processing import DeadtimeProcessing
 from simulation.gen_sim_data import GenerateSimData
 
 use_sim = False
+process = False
 
 def main():
     run()
@@ -42,16 +43,16 @@ def run():
         ncl = netCDFLoader(config, use_sim)
         ranges, shots_time = ncl.load_chunks(preprocess_path, generic_fname)
 
-    gh = GenerateHistogram(config)
-
-    r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
-
     dpl = DataPlotter(config)
     dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+
+    gh = GenerateHistogram(config)
+    r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
     dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
 
-    dp = DeadtimeProcessing(config)
-    dp.deadtime_fitting(H, r_binedges, t_binedges, low_gain)
+    if process:
+        dp = DeadtimeProcessing(config)
+        dp.deadtime_fitting(H, r_binedges, t_binedges, low_gain)
 
     # dpl = DataPlotter(config)
     # dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
