@@ -23,16 +23,18 @@ process_params:
   load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
   range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
-  apply_corrections: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram.
+  apply_bin_corrections: False  # Set TRUE if user desires to apply standar Mueller correction to histogram. Set FALSE if just doing scatter plot or no desire to correct for histogram.
   active_fraction: True  # Set TRUE if calculating active-fraction histogram
   fractional_bin: True  # Set TRUE if using fractional binning in range. FALSE will use final histogram resolution when calculating AF. 
   range_shift: 0.107  # [m] value for range shift correction, based on channel path-length difference 
   bg_sub: True  # Set TRUE to background subtract. Set FALSE to skip. 
+  diff_overlap: False
 
 plot_params:
   plot_ylim: True  # Set TRUE to limit vertical range when plotting
   plot_xlim: True  # Set TRUE to limit horizontal range when plotting
   histogram: False  # Set TRUE if histogram plotting. Set FALSE if scatter plotting
+  scatter: True
   save_img: True  # Set TRUE to save figure out to image directory.
 
   tbinsize: 0.075   # [s] temporal bin size
