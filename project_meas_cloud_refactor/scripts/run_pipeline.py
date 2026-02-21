@@ -14,7 +14,7 @@ from processing.deadtime_processing import DeadtimeProcessing
 from simulation.gen_sim_data import GenerateSimData
 
 use_sim = False
-process = False
+process = True
 
 def main():
     run()
