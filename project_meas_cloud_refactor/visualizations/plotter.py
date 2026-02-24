@@ -5,6 +5,7 @@ Objective: Script to handle plotting functions
 import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+from matplotlib.ticker import ScalarFormatter, MaxNLocator
 from pathlib import Path
 import os
 
@@ -110,25 +111,32 @@ class DataPlotter:
             ax = fig.add_subplot(111)
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
-                                 flux,
+                                 flux/1e6,
                                  cmap='viridis',
-                                 norm=LogNorm(vmin=flux[flux > 0].min(),
-                                              vmax=flux.max())
-                                 # norm=LogNorm(2e5,
-                                 #              2e9)
+                                 norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
+                                              vmax=flux.max()/1e6)
+                                 # norm=LogNorm(2e2,
+                                 #              2e3)
                                  )
             cbar = fig.colorbar(mesh, ax=ax)
-            cbar.set_label('Flux [Hz]')
+            cbar.set_label('Flux [MHz]')
+            # ticks = [200, 300, 400, 600, 1000, 2000]
+            # cbar.set_ticks(ticks)
+            # cbar.set_ticklabels([f"{t:g}" for t in ticks])
             ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
             ax.set_ylabel('Range [km]')
             ax.set_title(
                 timestamp.strftime(
                     "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)\n{:.2e} m x {:.2e} s".format(
                         "Low Gain" if low_gain else "High Gain", dr, dt)
-                )
+                ),
+                pad=20
             ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
+            # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+            # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+            # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             plt.tight_layout()
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
@@ -143,30 +151,33 @@ class DataPlotter:
             plt.show()
 
 def plot_fits(
-            cnts_1D,
-            r_binsize_t,
-            Nshots,
-            r_centers_trim,
-            lamb_out_pois,
-            lamb_out_dead,
-            degree,
-            loss_list_pois,
-            loss_list_dead
+        cnts_1D,
+        r_binsize_t,
+        Nshots,
+        r_centers_trim,
+        lamb_out_pois,
+        lamb_out_dead,
+        degree,
+        loss_list_pois,
+        loss_list_dead
     ):
     """
     Plot fit outputs from Optimizer routine and loss behavior during descent.
     """
-    fig = plt.figure(dpi=400)
+    fig = plt.figure(
+        dpi=400,
+        figsize=(3, 4)
+    )
     ax = fig.add_subplot(111)
-    ax.plot(cnts_1D / r_binsize_t / Nshots / 1e6, r_centers_trim / 1e3, 'o', alpha=0.5, label='Raw')
+    ax.plot(cnts_1D / r_binsize_t / Nshots / 1e6, r_centers_trim / 1e3, '.', alpha=0.5, label='Raw')
     ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', alpha=0.7, label='Poisson Fit')
     ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', alpha=0.7, label='Deadtime Fit')
-    # if use_sim:
-    #     ax.plot(lamb / 1e6, r / 1e3, '-', alpha=0.7, label='Simulated Truth')
-    #     ax.set_ylim([loader.r_plot_min, loader.r_plot_max])
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
     ax.set_title('Fit: Degree {}'.format(degree))
+    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+    plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
+    ax.set_ylim([2.937, 2.939])
     # ax.set_xscale('log')
     plt.legend()
     plt.tight_layout()
