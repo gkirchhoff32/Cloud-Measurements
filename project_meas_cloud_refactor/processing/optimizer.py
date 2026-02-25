@@ -23,7 +23,22 @@ class Optimizer(torch.nn.Module):
 
         return lamb
 
-def optimize(Y, Z, t, Nshots, num_steps, degree, deadtime, learning_rate, rel_step_lim, max_epochs, term_persist):
+def optimize(
+        t,
+        Y_train,
+        Y_val,
+        Z_train,
+        Z_val,
+        Nshots_train,
+        Nshots_val,
+        degree,
+        deadtime,
+        learning_rate,
+        rel_step_lim,
+        max_epochs,
+        term_persist
+):
+    print('Computing for degree: {}'.format(degree))
     dr_t = torch.diff(t)[0]  # [s] range resolution in time
 
     model = Optimizer(degree=degree, t=t)
@@ -35,11 +50,13 @@ def optimize(Y, Z, t, Nshots, num_steps, degree, deadtime, learning_rate, rel_st
     rel_step_lst = []
     fit_loss_lst = []
     while (rel_step > rel_step_lim) and (epoch < max_epochs):
-
         optimizer.zero_grad()
         lamb = model()  # (M,)
 
-        loss = dtime_loss_fn(lamb, Z, Y, Nshots, dr_t) if (deadtime == True) else pois_loss_fn(lamb, Y, Nshots, dr_t)
+        if deadtime:
+            loss = dtime_loss_fn(lamb, Z_train, Y_train, Nshots_train, dr_t)
+        else:
+            loss = pois_loss_fn(lamb, Y_train, Nshots_train, dr_t)
         fit_loss_lst += [loss.item()]
 
         if epoch % 100 == 0:
@@ -55,5 +72,15 @@ def optimize(Y, Z, t, Nshots, num_steps, degree, deadtime, learning_rate, rel_st
     print('Exited process at epoch {}/{}'.format(epoch, max_epochs))
     with torch.no_grad():
         lamb_out = model()
+        if deadtime:
+            loss_val = dtime_loss_fn(lamb_out, Z_val, Y_val, Nshots_val, dr_t)
+        else:
+            loss_val = pois_loss_fn(lamb_out, Y_val, Nshots_val, dr_t)
 
-    return lamb_out.detach().cpu().numpy(), model.C.detach().cpu().numpy(), model.B.detach().cpu().numpy(), fit_loss_lst
+    return (
+        lamb_out.detach().cpu().numpy(),
+        model.C.detach().cpu().numpy(),
+        model.B.detach().cpu().numpy(),
+        fit_loss_lst,
+        loss_val.item()
+    )

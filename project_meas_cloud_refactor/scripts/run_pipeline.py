@@ -12,9 +12,12 @@ from visualizations.plotter import DataPlotter
 from processing.generate_histogram import GenerateHistogram
 from processing.deadtime_processing import DeadtimeProcessing
 from simulation.gen_sim_data import GenerateSimData
+from utils.array_utils import bootstrap
 
 use_sim = False
-process = False
+process = True
+degree_start = 8
+degree_end = 25
 
 def main():
     run()
@@ -44,18 +47,22 @@ def run():
         ranges, shots_time = ncl.load_chunks(preprocess_path, generic_fname)
 
     dpl = DataPlotter(config)
-    dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+    # dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
 
-    # gh = GenerateHistogram(config)
-    # r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
-    # dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
+    gh = GenerateHistogram(config)
+    r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
+    dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
+    H_train, H_val = bootstrap(H)
+    # quit()
 
     if process:
         dp = DeadtimeProcessing(config)
-        flux_bin_est, r_binedges_trim = dp.binwise_correction(flux, r_binedges, t_binedges, H, low_gain)
-        dpl.plot_histogram(flux_bin_est, t_binedges, r_binedges_trim, timestamp, low_gain, generic_fname)
+        # flux_bin_est, r_binedges_trim = dp.binwise_correction(flux, r_binedges, t_binedges, H, low_gain)
+        # dpl.plot_histogram(flux_bin_est, t_binedges, r_binedges_trim, timestamp, low_gain, generic_fname)
 
         # dp.deadtime_fitting(H, r_binedges, t_binedges, low_gain)
+        dp.optimize_complexity(t_binedges, r_binedges, H_train, H_val, low_gain, degree_start, degree_end)
+        quit()
 
 
 if __name__ == "__main__":

@@ -28,28 +28,128 @@ class DeadtimeProcessing:
         self.dpi = config['plot_params']['dpi']  # dots-per-inch
         self.figsize = config['plot_params']['figsize']  # figure size in inches
 
-    def deadtime_fitting(self, cnts, r_binedges, t_binedges, low_gain):
-        """
-        Process the histogram data via parametric fitting using the deadtime noise model
-        """
+    def optimize_complexity(self, t_binedges, r_binedges, cnts_train, cnts_val, low_gain, degree_start, degree_end):
+        (
+            cnts_1D_train,
+            af_hist_1D_train,
+            r_centers_trim_t,
+            Nshots_train,
+            r_binsize_t,
+            r_centers_trim
+        ) = self.condition_fitting(
+            t_binedges,
+            r_binedges,
+            cnts_train,
+            low_gain
+        )
+
+        (
+            cnts_1D_val,
+            af_hist_1D_val,
+            __,
+            Nshots_val,
+            __,
+            __
+        ) = self.condition_fitting(
+            t_binedges,
+            r_binedges,
+            cnts_val,
+            low_gain
+        )
+
+        degrees = np.arange(degree_start, degree_end + 1)  # polynomial orders to iterate over
+        loss_list_tot_dead = []
+        loss_list_tot_pois = []
+        loss_train_dead = []
+        loss_train_pois = []
+        lamb_out_dead_tot = []
+        lamb_out_pois_tot = []
+        loss_val_dead_tot = []
+        loss_val_pois_tot = []
+        for degree in degrees:
+            results = self.deadtime_fitting(
+                degree,
+                r_centers_trim_t,
+                cnts_1D_train,
+                cnts_1D_val,
+                af_hist_1D_train,
+                af_hist_1D_val,
+                Nshots_train,
+                Nshots_val
+            )
+            lamb_out_dead, model_C_dead, model_B_dead, loss_list_dead, loss_val_dead = results['deadtime']
+            lamb_out_pois, model_C_pois, model_B_pois, loss_list_pois, loss_val_pois = results['poisson']
+
+            loss_train_dead.append(loss_list_dead[-1])
+            loss_train_pois.append(loss_list_pois[-1])
+            loss_list_tot_dead.append(loss_list_dead)
+            loss_list_tot_pois.append(loss_list_pois)
+            lamb_out_dead_tot.append(lamb_out_dead)
+            lamb_out_pois_tot.append(lamb_out_pois)
+
+            loss_val_dead_tot.append(loss_val_dead)
+            loss_val_pois_tot.append(loss_val_pois)
+
+        min_loss_idx_dead = np.argmin(loss_val_dead_tot)
+        min_loss_idx_pois = np.argmin(loss_val_pois_tot)
+        optimal_degree_dead = degrees[min_loss_idx_dead]
+        optimal_degree_pois = degrees[min_loss_idx_pois]
+        lamb_out_dead_best = lamb_out_dead_tot[min_loss_idx_dead]
+        lamb_out_pois_best = lamb_out_pois_tot[min_loss_idx_pois]
+        loss_list_dead_best = loss_list_tot_dead[min_loss_idx_dead]
+        loss_list_pois_best = loss_list_tot_pois[min_loss_idx_pois]
+
+        # print('Deadtime loss vals: {}'.format(loss_train_dead))
+        # print('Poisson loss vals: {}'.format(loss_train_pois))
+        print('Optimal degrees: Poisson {}, Deadtime {}'.format(optimal_degree_pois, optimal_degree_dead))
+        plot_fits(
+            cnts_1D_train,
+            cnts_1D_val,
+            r_binsize_t,
+            Nshots_train,
+            r_centers_trim,
+            lamb_out_pois_best,
+            lamb_out_dead_best,
+            optimal_degree_pois,
+            optimal_degree_dead,
+            loss_list_pois_best,
+            loss_list_dead_best
+        )
+
+    def condition_fitting(self, t_binedges, r_binedges, cnts, low_gain):
         af_hist, deadtime_trim_idx = self.gen_active_fraction(t_binedges, r_binedges, cnts, low_gain)
         cnts_trim = cnts[deadtime_trim_idx:, :]  # Trim count histogram to match active-fraction histogram
 
-        num_tbins = af_hist.shape[1]
-        cnts_1D = torch.from_numpy(cnts_trim.sum(axis=1)).float()
-        af_hist_1D = torch.from_numpy(af_hist.sum(axis=1)).float() / num_tbins
+        num_col = np.sum(~np.isnan(cnts_trim).all(axis=0))
+        cnts_1D = torch.from_numpy(np.nansum(cnts_trim, axis=1)).float()
+        af_hist_1D = torch.from_numpy(np.nansum(af_hist, axis=1)).float() / num_col
         r_binedges = torch.from_numpy(r_binedges).float()
 
         rep_rate = 14.3e3  # [Hz]
-        t_range = t_binedges[-1] - t_binedges[0]  # [s]
-        Nshots = t_range * rep_rate
+        # t_range = t_binedges[-1] - t_binedges[0]  # [s]
+        dr = np.diff(t_binedges)[0]
+        Nshots = dr * num_col * rep_rate
         r_binsize = torch.diff(r_binedges)[0]  # [m] range bin size in meters
         r_binsize_t = range_to_time(r_binsize, self.c)  # [s] range bin size in seconds
         r_centers_trim = r_binedges[deadtime_trim_idx:-1] + r_binsize / 2  # trimmed to match active-fraction histogram
         r_centers_trim_t = range_to_time(r_centers_trim, self.c)  # [s] convert range to time for optimization
 
-        degree = 2
-        num_steps = 2000
+        return cnts_1D, af_hist_1D, r_centers_trim_t, Nshots, r_binsize_t, r_centers_trim
+
+    def deadtime_fitting(
+            self,
+            degree,
+            r_centers_trim_t,
+            cnts_1D_train,
+            cnts_1D_val,
+            af_hist_1D_train,
+            af_hist_1D_val,
+            Nshots_train,
+            Nshots_val
+    ):
+        """
+        Process the histogram data via parametric fitting using the deadtime noise model
+        """
         lr = 1e-1  # Learning rate
         rel_step_lim = 1e-8
         max_epochs = 10000
@@ -58,11 +158,13 @@ class DeadtimeProcessing:
         results = {}
         for mode in ['deadtime', 'poisson']:
             results[mode] = optimize(
-                Y=cnts_1D,
-                Z=af_hist_1D,
                 t=r_centers_trim_t,
-                Nshots=Nshots,
-                num_steps=num_steps,
+                Y_train=cnts_1D_train,
+                Y_val=cnts_1D_val,
+                Z_train=af_hist_1D_train,
+                Z_val=af_hist_1D_val,
+                Nshots_train=Nshots_train,
+                Nshots_val=Nshots_val,
                 degree=degree,
                 deadtime=(mode == "deadtime"),
                 learning_rate=lr,
@@ -71,21 +173,7 @@ class DeadtimeProcessing:
                 term_persist=term_persist
             )
 
-        lamb_out_dead, model_C_dead, model_B_dead, loss_list_dead = results['deadtime']
-        lamb_out_pois, model_C_pois, model_B_pois, loss_list_pois = results['poisson']
-        print('Background term: deadtime {:.0f} Hz, poisson {:.0f} Hz'.format(model_B_dead[0], model_B_pois[0]))
-
-        plot_fits(
-            cnts_1D,
-            r_binsize_t,
-            Nshots,
-            r_centers_trim,
-            lamb_out_pois,
-            lamb_out_dead,
-            degree,
-            loss_list_pois,
-            loss_list_dead
-        )
+        return results
 
     def binwise_correction(self, flux, r_binedges, t_binedges, cnts, low_gain):
         """

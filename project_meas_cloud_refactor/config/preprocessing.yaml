@@ -38,16 +38,16 @@ plot_params:
   scatter: True  # Set TRUE if scatter plotting.
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 0.005   # [s] temporal bin size
-  rbinsize: 0.1   # [m] range bin size
-  ylim: [1.75, 3.5]  # [km] excluding last value if histogram
+  tbinsize: 0.0007   # [s] temporal bin size
+  rbinsize: 0.01   # [m] range bin size
+  ylim: [2.937, 2.939]  # [km] excluding last value if histogram
   # ylim: [12.0e-3, 15.0e-3]  # [km] Good values for range bin test
   # xlim: [215, 320]  # [s] x-axis limits if 'use_xlim' is TRUE
   # xlim: [160, 215]  # [s] excluding last value if histogram
-  xlim: [750, 870]  # [s]
+  xlim: [797.48, 797.57]  # [s]
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
-  figsize: [2.75, 3.5]   # figure size in inches
+  figsize: [3, 5]   # figure size in inches
   dot_size: 0.0005    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot

@@ -151,13 +151,15 @@ class DataPlotter:
             plt.show()
 
 def plot_fits(
-        cnts_1D,
+        cnts_1D_train,
+        cnts_1D_val,
         r_binsize_t,
         Nshots,
         r_centers_trim,
         lamb_out_pois,
         lamb_out_dead,
-        degree,
+        degree_pois,
+        degree_dead,
         loss_list_pois,
         loss_list_dead
     ):
@@ -169,12 +171,13 @@ def plot_fits(
         figsize=(3, 4)
     )
     ax = fig.add_subplot(111)
-    ax.plot(cnts_1D / r_binsize_t / Nshots / 1e6, r_centers_trim / 1e3, '.', alpha=0.5, label='Raw')
-    ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', alpha=0.7, label='Poisson Fit')
-    ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', alpha=0.7, label='Deadtime Fit')
+    ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="#6E6E6E", markeredgewidth=0, alpha=0.25, label='Raw (train)')
+    ax.plot(cnts_1D_val/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, 's', color="#4A4A4A", markersize=3, mec=None, alpha=0.25, label='Raw (validation)')
+    ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
+    ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Deadtime Fit')
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
-    ax.set_title('Fit: Degree {}'.format(degree))
+    ax.set_title('Fit: Poisson Degree {}, Deadtime Degree {}'.format(degree_pois, degree_dead))
     ax.yaxis.set_major_locator(plt.MaxNLocator(5))
     plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
     ax.set_ylim([2.937, 2.939])
