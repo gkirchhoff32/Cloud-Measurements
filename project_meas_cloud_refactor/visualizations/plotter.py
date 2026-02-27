@@ -134,9 +134,9 @@ class DataPlotter:
             ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
-            # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-            # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-            # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
+            ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+            plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+            plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             plt.tight_layout()
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
