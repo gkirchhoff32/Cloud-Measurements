@@ -79,7 +79,7 @@ class GenerateHistogram:
 
         min_time, max_time = shots_time[0], shots_time[-1]  # [s]
         rbins = np.arange(min_range, max_range + rbinsize, rbinsize)  # [m]
-        tbins = np.arange(min_time, max_time, tbinsize)  # [s]
+        tbins = np.arange(min_time, max_time + tbinsize, tbinsize)  # [s]
 
         print('Actual range and time bin sizes: {:.3e} m x {:.3e} s'.format(rbinsize, tbinsize))
 

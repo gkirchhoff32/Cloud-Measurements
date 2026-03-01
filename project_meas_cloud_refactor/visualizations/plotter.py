@@ -115,8 +115,8 @@ class DataPlotter:
                                  cmap='viridis',
                                  norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
                                               vmax=flux.max()/1e6)
-                                 # norm=LogNorm(2e2,
-                                 #              2e3)
+                                 # norm=LogNorm(5.0e-3,
+                                 #              4e0)
                                  )
             cbar = fig.colorbar(mesh, ax=ax)
             cbar.set_label('Flux [MHz]')
@@ -134,6 +134,7 @@ class DataPlotter:
             ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
+            # ax.set_xlim([795, 800])
             ax.yaxis.set_major_locator(plt.MaxNLocator(5))
             plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
             plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
@@ -180,7 +181,8 @@ def plot_fits(
     ax.set_title('Fit: Poisson Degree {}, Deadtime Degree {}'.format(degree_pois, degree_dead))
     ax.yaxis.set_major_locator(plt.MaxNLocator(5))
     plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
-    ax.set_ylim([2.937, 2.939])
+    # ax.set_ylim([2.937, 2.939])
+    # ax.set_xlim([2, 300])
     # ax.set_xscale('log')
     plt.legend()
     plt.tight_layout()
@@ -201,38 +203,54 @@ def plot_af_histogram(t_binedges, tbinsize, r_binedges, deadtime_trim_idx, af_hi
     """
     Plot active-fraction histogram.
     """
-    extent_t0, extent_t1 = (
-        (t_binedges[0] - (tbinsize / 2)),
-        (t_binedges[-1] + (tbinsize / 2))
-    )  # [s, s]
-    extent_r0, extent_r1 = (
-        (r_binedges[deadtime_trim_idx] / 1e3),
-        (r_binedges[-1] / 1e3)
-    )  # [km, km]
+    # extent_t0, extent_t1 = (
+    #     (t_binedges[0] - (tbinsize / 2)),
+    #     (t_binedges[-1] + (tbinsize / 2))
+    # )  # [s, s]
+    # extent_r0, extent_r1 = (
+    #     (r_binedges[deadtime_trim_idx] / 1e3),
+    #     (r_binedges[-1] / 1e3)
+    # )  # [km, km]
 
-    fig = plt.figure(
-        figsize=(6, 4),
-        dpi=400
-    )
+    fig = plt.figure(dpi=400, figsize=(3, 4))
     ax = fig.add_subplot(111)
-    im = ax.imshow(
-        af_hist,
-        aspect='auto',
-        origin='lower',
-        cmap='viridis',
-        extent=[
-            extent_t0,
-            extent_t1,
-            extent_r0,
-            extent_r1
-        ]
-    )
-    im.set_clim(0, 1)
-    cbar = fig.colorbar(
-        im,
-        ax=ax
-    )
+    mesh = ax.pcolormesh(t_binedges,
+                         r_binedges[deadtime_trim_idx:] / 1e3,
+                         af_hist,
+                         cmap='viridis',
+                         vmin=0,
+                         vmax=1
+                         )
+    cbar = fig.colorbar(mesh, ax=ax)
     cbar.set_label('AF Value')
     ax.set_xlabel('Time [s]')
     ax.set_ylabel('Range [km]')
+    plt.tight_layout()
     plt.show()
+
+    # fig = plt.figure(
+    #     figsize=(6, 4),
+    #     dpi=400
+    # )
+    # ax = fig.add_subplot(111)
+    # im = ax.imshow(
+    #     af_hist,
+    #     aspect='auto',
+    #     origin='lower',
+    #     cmap='viridis',
+    #     extent=[
+    #         extent_t0,
+    #         extent_t1,
+    #         extent_r0,
+    #         extent_r1
+    #     ]
+    # )
+    # im.set_clim(0, 1)
+    # cbar = fig.colorbar(
+    #     im,
+    #     ax=ax
+    # )
+    # cbar.set_label('AF Value')
+    # ax.set_xlabel('Time [s]')
+    # ax.set_ylabel('Range [km]')
+    # plt.show()

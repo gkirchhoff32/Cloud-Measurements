@@ -15,9 +15,9 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-process = False
-degree_start = 8
-degree_end = 25
+process = True
+degree_start = 2
+degree_end = 30
 
 def main():
     run()
@@ -52,10 +52,10 @@ def run():
     gh = GenerateHistogram(config)
     r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
     dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
-    # H_train, H_val = bootstrap(H)
-    # # quit()
 
     if process:
+        H_train, H_val = bootstrap(H)
+
         dp = DeadtimeProcessing(config)
         # flux_bin_est, r_binedges_trim = dp.binwise_correction(flux, r_binedges, t_binedges, H, low_gain)
         # dpl.plot_histogram(flux_bin_est, t_binedges, r_binedges_trim, timestamp, low_gain, generic_fname)

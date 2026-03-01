@@ -116,6 +116,9 @@ class DeadtimeProcessing:
             loss_list_dead_best
         )
 
+        print('\nPoisson result average flux: {:.2e} Hz'.format(np.mean(lamb_out_pois_best)))
+        print('Deadtime result average flux: {:.2e} Hz'.format(np.mean(lamb_out_dead_best)))
+
     def condition_fitting(self, t_binedges, r_binedges, cnts, low_gain):
         af_hist, deadtime_trim_idx = self.gen_active_fraction(t_binedges, r_binedges, cnts, low_gain)
         cnts_trim = cnts[deadtime_trim_idx:, :]  # Trim count histogram to match active-fraction histogram
