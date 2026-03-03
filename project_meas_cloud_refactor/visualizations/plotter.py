@@ -5,7 +5,8 @@ Objective: Script to handle plotting functions
 import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
-from matplotlib.ticker import ScalarFormatter, MaxNLocator
+from matplotlib.gridspec import GridSpec
+# from matplotlib.ticker import LogLocator, FuncFormatter
 from pathlib import Path
 import os
 
@@ -47,7 +48,9 @@ class DataPlotter:
                                   self.figsize[1]),
                          constrained_layout=True
                          )
-        ax = fig.add_subplot(111)
+        gs = GridSpec(1, 20, figure=fig)
+        ax = fig.add_subplot(gs[0, :18])
+        # ax = fig.add_subplot(111)
         ax.scatter(shots_time,
                    ranges / 1e3,
                    s=self.dot_size,
@@ -58,11 +61,13 @@ class DataPlotter:
         ax.set_xlim(self.xlim) if self.plot_xlim else None
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
+        ax.yaxis.set_major_locator(plt.MaxNLocator(5))
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
-            )
-        ) if timestamp else ax.set_title('Simulated Backscatter')
+            ),
+            pad=20
+        ) if timestamp else ax.set_title('Simulated Backscatter', pad=20)
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             print('Starting to save image...')
@@ -98,28 +103,35 @@ class DataPlotter:
                              figsize=self.figsize
                              )
             ax = fig.add_subplot(111)
-            ax.plot(flux, r_centers, '-')
-            ax.set_xlabel('Flux [Hz]')
-            ax.set_ylabel('Range [m]')
+            ax.plot(flux/1e6, r_centers/1e3, 'o')
+            ax.set_xlabel('Flux [MHz]')
+            ax.set_ylabel('Range [km]')
             ax.set_title('Flux Histogram')
+            # ax.set_ylim([1.8, 1.82])
+            # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
             plt.tight_layout()
             plt.show()
         else:
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
                              )
-            ax = fig.add_subplot(111)
+            gs = GridSpec(1, 20, figure=fig)
+            ax = fig.add_subplot(gs[0, :18])
+            cax = fig.add_subplot(gs[0, 19:])
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
                                  flux/1e6,
                                  cmap='viridis',
-                                 norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
-                                              vmax=flux.max()/1e6)
-                                 # norm=LogNorm(5.0e-3,
-                                 #              4e0)
+                                 # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
+                                 #              vmax=flux.max()/1e6)
+                                 norm=LogNorm(6.0e-1,
+                                              2e0)
                                  )
-            cbar = fig.colorbar(mesh, ax=ax)
+            cbar = fig.colorbar(mesh, cax=cax)
             cbar.set_label('Flux [MHz]')
+            ticks = [0.6, 1, 2]
+            cbar.set_ticks(ticks)
+            cbar.set_ticklabels([str(t) for t in ticks])
             # ticks = [200, 300, 400, 600, 1000, 2000]
             # cbar.set_ticks(ticks)
             # cbar.set_ticklabels([f"{t:g}" for t in ticks])
@@ -134,11 +146,12 @@ class DataPlotter:
             ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
-            # ax.set_xlim([795, 800])
+            ax.set_xlim([160, 215])
             ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-            plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-            plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
-            plt.tight_layout()
+            fig.subplots_adjust(left=0.2, bottom=0.18, right=0.85, top=0.92)
+            # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+            # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
+            # plt.tight_layout()
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
                 print('Starting to save image...')

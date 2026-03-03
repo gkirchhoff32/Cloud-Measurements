@@ -15,7 +15,7 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-process = True
+process = False
 degree_start = 2
 degree_end = 30
 
@@ -47,11 +47,11 @@ def run():
         ranges, shots_time = ncl.load_chunks(preprocess_path, generic_fname)
 
     dpl = DataPlotter(config)
-    # dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+    dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
 
-    gh = GenerateHistogram(config)
-    r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
-    dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
+    # gh = GenerateHistogram(config)
+    # r_binedges, t_binedges, flux, H = gh.gen_histogram(ranges, shots_time, low_gain)
+    # dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
 
     if process:
         H_train, H_val = bootstrap(H)
