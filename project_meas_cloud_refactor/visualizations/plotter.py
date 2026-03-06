@@ -44,13 +44,11 @@ class DataPlotter:
         start = time.time()
 
         fig = plt.figure(dpi=self.dpi,
-                         figsize=(self.figsize[0],
-                                  self.figsize[1]),
-                         constrained_layout=True
+                         figsize=self.figsize
                          )
-        gs = GridSpec(1, 20, figure=fig)
-        ax = fig.add_subplot(gs[0, :18])
-        # ax = fig.add_subplot(111)
+        # gs = GridSpec(1, 20, figure=fig)
+        # ax = fig.add_subplot(gs[0, :18])
+        ax = fig.add_subplot(111)
         ax.scatter(shots_time,
                    ranges / 1e3,
                    s=self.dot_size,
@@ -62,6 +60,7 @@ class DataPlotter:
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+        fig.subplots_adjust(left=0.25, bottom=0.1, right=0.9, top=0.92)
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
@@ -117,21 +116,21 @@ class DataPlotter:
                              )
             gs = GridSpec(1, 20, figure=fig)
             ax = fig.add_subplot(gs[0, :18])
-            cax = fig.add_subplot(gs[0, 19:])
+            # cax = fig.add_subplot(gs[0, 19:])
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
                                  flux/1e6,
                                  cmap='viridis',
                                  # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
                                  #              vmax=flux.max()/1e6)
-                                 norm=LogNorm(6.0e-1,
-                                              2e0)
+                                 norm=LogNorm(2e-1,
+                                              9e2)
                                  )
-            cbar = fig.colorbar(mesh, cax=cax)
-            cbar.set_label('Flux [MHz]')
-            ticks = [0.6, 1, 2]
-            cbar.set_ticks(ticks)
-            cbar.set_ticklabels([str(t) for t in ticks])
+            # cbar = fig.colorbar(mesh, cax=cax)
+            # cbar.set_label('Flux [MHz]')
+            # ticks = [0.6, 1, 2]
+            # cbar.set_ticks(ticks)
+            # cbar.set_ticklabels([str(t) for t in ticks])
             # ticks = [200, 300, 400, 600, 1000, 2000]
             # cbar.set_ticks(ticks)
             # cbar.set_ticklabels([f"{t:g}" for t in ticks])
@@ -146,9 +145,9 @@ class DataPlotter:
             ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
-            ax.set_xlim([160, 215])
+            # ax.set_xlim([160, 215])
             ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-            fig.subplots_adjust(left=0.2, bottom=0.18, right=0.85, top=0.92)
+            fig.subplots_adjust(left=0.25, bottom=0.18, right=1, top=0.92)
             # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
             # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             # plt.tight_layout()
@@ -182,20 +181,28 @@ def plot_fits(
     """
     fig = plt.figure(
         dpi=400,
-        figsize=(3, 4)
+        figsize=(3, 5)
     )
     ax = fig.add_subplot(111)
-    ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="#6E6E6E", markeredgewidth=0, alpha=0.25, label='Raw (train)')
+    ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
     ax.plot(cnts_1D_val/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, 's', color="#4A4A4A", markersize=3, mec=None, alpha=0.25, label='Raw (validation)')
     ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
     ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Deadtime Fit')
+    ax.axvline(
+        x=3,
+        color="#FF69B4",  # hot pink
+        linestyle="--",
+        linewidth=2,
+        alpha=0.9,
+        label='Coarse Value'
+    )
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
     ax.set_title('Fit: Poisson Degree {}, Deadtime Degree {}'.format(degree_pois, degree_dead))
     ax.yaxis.set_major_locator(plt.MaxNLocator(5))
     plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
-    # ax.set_ylim([2.937, 2.939])
-    # ax.set_xlim([2, 300])
+    ax.set_ylim([2.937, 2.939])
+    # ax.set_xlim([0, 300])
     # ax.set_xscale('log')
     plt.legend()
     plt.tight_layout()
