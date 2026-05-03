@@ -60,7 +60,8 @@ class DataPlotter:
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-        fig.subplots_adjust(left=0.25, bottom=0.1, right=0.9, top=0.92)
+        # fig.subplots_adjust(left=0.25, bottom=0.1, right=0.9, top=0.92)
+        fig.subplots_adjust(bottom=0.15, top=0.85)
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")

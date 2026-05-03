@@ -135,7 +135,7 @@ class DataPreprocessor:
                 # Identify detection events ('detect') and laser pulse events ('sync')
                 detect, sync = locate_detect_sync(chunk_fin, chunk_iter)
 
-                """ 
+                """
                 ----------------------------------------------
                 PART 2: CONVERT TIMESTAMPS TO RANGES AND SHOTS
                 ----------------------------------------------
