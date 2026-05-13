@@ -46,9 +46,9 @@ class DataPlotter:
         fig = plt.figure(dpi=self.dpi,
                          figsize=self.figsize
                          )
-        # gs = GridSpec(1, 20, figure=fig)
-        # ax = fig.add_subplot(gs[0, :18])
-        ax = fig.add_subplot(111)
+        gs = GridSpec(1, 20, figure=fig)
+        ax = fig.add_subplot(gs[0, :18])
+        # ax = fig.add_subplot(111)
         ax.scatter(shots_time,
                    ranges / 1e3,
                    s=self.dot_size,
@@ -60,8 +60,8 @@ class DataPlotter:
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-        # fig.subplots_adjust(left=0.25, bottom=0.1, right=0.9, top=0.92)
-        fig.subplots_adjust(bottom=0.15, top=0.85)
+        fig.subplots_adjust(left=0.25, bottom=0.11, right=0.9, top=0.92)
+        # fig.subplots_adjust(bottom=0.15, top=0.85)
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
@@ -116,8 +116,8 @@ class DataPlotter:
                              figsize=self.figsize
                              )
             gs = GridSpec(1, 20, figure=fig)
-            ax = fig.add_subplot(gs[0, :18])
-            # cax = fig.add_subplot(gs[0, 19:])
+            ax = fig.add_subplot(gs[0, :14])
+            cax = fig.add_subplot(gs[0, 16:17])
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
                                  flux/1e6,
@@ -127,8 +127,8 @@ class DataPlotter:
                                  norm=LogNorm(2e-1,
                                               9e2)
                                  )
-            # cbar = fig.colorbar(mesh, cax=cax)
-            # cbar.set_label('Flux [MHz]')
+            cbar = fig.colorbar(mesh, cax=cax)
+            cbar.set_label('Flux [MHz]')
             # ticks = [0.6, 1, 2]
             # cbar.set_ticks(ticks)
             # cbar.set_ticklabels([str(t) for t in ticks])
