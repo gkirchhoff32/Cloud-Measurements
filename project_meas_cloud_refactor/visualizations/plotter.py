@@ -46,9 +46,9 @@ class DataPlotter:
         fig = plt.figure(dpi=self.dpi,
                          figsize=self.figsize
                          )
-        gs = GridSpec(1, 20, figure=fig)
-        ax = fig.add_subplot(gs[0, :18])
-        # ax = fig.add_subplot(111)
+        # gs = GridSpec(1, 20, figure=fig)
+        # ax = fig.add_subplot(gs[0, :18])
+        ax = fig.add_subplot(111)
         ax.scatter(shots_time,
                    ranges / 1e3,
                    s=self.dot_size,
@@ -60,8 +60,11 @@ class DataPlotter:
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-        fig.subplots_adjust(left=0.25, bottom=0.11, right=0.9, top=0.92)
+        # fig.subplots_adjust(left=0.25, bottom=0.11, right=0.9, top=0.92)
         # fig.subplots_adjust(bottom=0.15, top=0.85)
+        fig.subplots_adjust(bottom=0.25)
+        ax.ticklabel_format(useOffset=False, style='plain', axis='x')
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
@@ -182,7 +185,7 @@ def plot_fits(
     """
     fig = plt.figure(
         dpi=400,
-        figsize=(3, 5)
+        figsize=(3, 4)
     )
     ax = fig.add_subplot(111)
     ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
@@ -202,7 +205,7 @@ def plot_fits(
     ax.set_title('Fit: Poisson Degree {}, Deadtime Degree {}'.format(degree_pois, degree_dead))
     ax.yaxis.set_major_locator(plt.MaxNLocator(5))
     plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
-    ax.set_ylim([2.937, 2.939])
+    # ax.set_ylim([2.937, 2.939])
     # ax.set_xlim([0, 300])
     # ax.set_xscale('log')
     plt.legend()
