@@ -9,6 +9,7 @@ from matplotlib.gridspec import GridSpec
 # from matplotlib.ticker import LogLocator, FuncFormatter
 from pathlib import Path
 import os
+import torch
 
 from utils.path_utils import get_unique_filename, find_data_path
 from physics.conversions import time_to_range
@@ -183,9 +184,14 @@ def plot_fits(
     """
     Plot fit outputs from Optimizer routine and loss behavior during descent.
     """
+    avg_flux_train = torch.mean(cnts_1D_train/r_binsize_t/Nshots)  # [Hz]
+    avg_flux_val = torch.mean(cnts_1D_val/r_binsize_t/Nshots)  # [Hz]
+    avg_flux = (avg_flux_train + avg_flux_val) / 2  # [Hz]
+    # avg_flux_corrected = avg_flux / (1 - 29.5e-9 * avg_flux)  # [Hz]
+
     fig = plt.figure(
         dpi=400,
-        figsize=(3, 4)
+        figsize=(4, 4)
     )
     ax = fig.add_subplot(111)
     ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
@@ -193,12 +199,12 @@ def plot_fits(
     ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
     ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Deadtime Fit')
     ax.axvline(
-        x=3,
+        x=avg_flux/1e6,
         color="#FF69B4",  # hot pink
         linestyle="--",
         linewidth=2,
         alpha=0.9,
-        label='Coarse Value'
+        label='Average Flux'
     )
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
@@ -208,7 +214,7 @@ def plot_fits(
     # ax.set_ylim([2.937, 2.939])
     # ax.set_xlim([0, 300])
     # ax.set_xscale('log')
-    plt.legend()
+    plt.legend(fontsize=8)
     plt.tight_layout()
     plt.show()
 
