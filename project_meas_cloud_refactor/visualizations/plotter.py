@@ -10,6 +10,7 @@ from matplotlib.gridspec import GridSpec
 from pathlib import Path
 import os
 import torch
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 from utils.path_utils import get_unique_filename, find_data_path
 from physics.conversions import time_to_range
@@ -56,22 +57,31 @@ class DataPlotter:
                    alpha=self.alpha,
                    linewidths=0
                    )
-        ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
+        ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1 / self.PRF, self.c) / 1e3])
         ax.set_xlim(self.xlim) if self.plot_xlim else None
+
+        ax.set_box_aspect(1)  # makes the actual plotting area square
+
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
         # fig.subplots_adjust(left=0.25, bottom=0.11, right=0.9, top=0.92)
         # fig.subplots_adjust(bottom=0.15, top=0.85)
-        fig.subplots_adjust(bottom=0.25)
+        # fig.subplots_adjust(bottom=0.25)
         ax.ticklabel_format(useOffset=False, style='plain', axis='x')
-        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
             ),
             pad=20
         ) if timestamp else ax.set_title('Simulated Backscatter', pad=20)
+
+        fig.subplots_adjust(
+            left=0.18,
+            right=0.8,
+        )
+
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
             print('Starting to save image...')
@@ -119,9 +129,10 @@ class DataPlotter:
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
                              )
-            gs = GridSpec(1, 20, figure=fig)
-            ax = fig.add_subplot(gs[0, :14])
-            cax = fig.add_subplot(gs[0, 16:17])
+            # gs = GridSpec(1, 20, figure=fig)
+            # ax = fig.add_subplot(gs[0, :14])
+            # cax = fig.add_subplot(gs[0, 16:17])
+            ax = fig.add_subplot(111)
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
                                  flux/1e6,
@@ -131,6 +142,18 @@ class DataPlotter:
                                  norm=LogNorm(2e-1,
                                               9e2)
                                  )
+            cax = inset_axes(
+                ax,
+                width="4%",
+                height="100%",
+                loc="lower left",
+                bbox_to_anchor=(1.04, 0, 1, 1),
+                bbox_transform=ax.transAxes,
+                borderpad=0
+            )
+
+            cbar = fig.colorbar(mesh, cax=cax)
+            cbar.set_label('Flux [MHz]')
             cbar = fig.colorbar(mesh, cax=cax)
             cbar.set_label('Flux [MHz]')
             # ticks = [0.6, 1, 2]
@@ -148,14 +171,23 @@ class DataPlotter:
                 ),
                 pad=20
             ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
-            ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1/self.PRF, self.c) / 1e3])
+            ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1 / self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
+
+            ax.set_box_aspect(1)  # makes the actual histogram panel square
+
             # ax.set_xlim([160, 215])
             ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-            fig.subplots_adjust(left=0.25, bottom=0.18, right=1, top=0.92)
+            # fig.subplots_adjust(left=0.25, bottom=0.18, right=1, top=0.92)
             # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
             # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             # plt.tight_layout()
+
+            fig.subplots_adjust(
+                left=0.18,
+                right=0.8,
+            )
+
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
                 print('Starting to save image...')
