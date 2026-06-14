@@ -60,16 +60,15 @@ class DataPlotter:
         ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1 / self.PRF, self.c) / 1e3])
         ax.set_xlim(self.xlim) if self.plot_xlim else None
 
-        ax.set_box_aspect(1)  # makes the actual plotting area square
+        # ax.set_box_aspect(1)  # makes the actual plotting area square
 
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
         ax.yaxis.set_major_locator(plt.MaxNLocator(5))
-        # fig.subplots_adjust(left=0.25, bottom=0.11, right=0.9, top=0.92)
-        # fig.subplots_adjust(bottom=0.15, top=0.85)
-        # fig.subplots_adjust(bottom=0.25)
         ax.ticklabel_format(useOffset=False, style='plain', axis='x')
-        # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        # ax.ticklabel_format(useOffset=False, style='plain', axis='y')
+        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
@@ -78,8 +77,8 @@ class DataPlotter:
         ) if timestamp else ax.set_title('Simulated Backscatter', pad=20)
 
         fig.subplots_adjust(
-            left=0.18,
-            right=0.8,
+            left=0.22,
+            bottom=0.2
         )
 
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))

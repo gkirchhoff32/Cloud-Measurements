@@ -55,6 +55,6 @@ plot_params:
 
   dpi: 400          # set dpi for plotting
   save_dpi: 400    # set dpi for saved images
-  figsize: [3.5, 2.5]   # figure size in inches
+  figsize: [6, 4]   # figure size in inches
   dot_size: 1    # dot size for axes.scatter 's' param (marker size in points**2, according to API).
   alpha: 1  # set transparency in scatter plot

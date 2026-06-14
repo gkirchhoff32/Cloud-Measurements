@@ -16,7 +16,7 @@ from utils.array_utils import bootstrap
 
 use_sim = False
 process = False
-histogram = True
+histogram = False
 degree_start = 2
 degree_end = 6
 
