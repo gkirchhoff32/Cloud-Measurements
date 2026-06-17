@@ -38,8 +38,8 @@ plot_params:
   scatter: True  # Set TRUE if scatter plotting.
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 0.01   # [s] temporal bin size
-  rbinsize: 0.1   # [m] range bin size
+  tbinsize: 0.0007   # [s] temporal bin size
+  rbinsize: 0.004   # [m] range bin size
   ylim: [1.2384, 1.2398]  # [km] excluding last value if histogram
   xlim: [950.775, 950.85]  # [s] excluding last value if histogram
 

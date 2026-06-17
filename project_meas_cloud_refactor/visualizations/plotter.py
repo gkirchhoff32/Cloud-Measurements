@@ -5,6 +5,8 @@ Objective: Script to handle plotting functions
 import time
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
+import numpy as np
+import matplotlib.ticker as ticker
 from matplotlib.gridspec import GridSpec
 # from matplotlib.ticker import LogLocator, FuncFormatter
 from pathlib import Path
@@ -218,31 +220,40 @@ def plot_fits(
     avg_flux_train = torch.mean(cnts_1D_train/r_binsize_t/Nshots)  # [Hz]
     avg_flux_val = torch.mean(cnts_1D_val/r_binsize_t/Nshots)  # [Hz]
     avg_flux = (avg_flux_train + avg_flux_val) / 2  # [Hz]
+    avg_flux_10x10 = avg_flux * (1.2 / 10) * (0.1 / 10)  # [Hz]
+    avg_flux_10x10_mueller = avg_flux_10x10 / (1 - 31.8e-9 * avg_flux_10x10)  # [Hz]
+    print('Coarse (10 m x 10 s) flux estimate: {:.2f} kHz'.format(avg_flux_10x10_mueller/1e3))
     # avg_flux_corrected = avg_flux / (1 - 29.5e-9 * avg_flux)  # [Hz]
+
+    cnts_1D = torch.cat((cnts_1D_train, cnts_1D_val), dim=0)
+    r_centers_trim_cat = torch.cat((r_centers_trim, r_centers_trim), dim=0)
 
     fig = plt.figure(
         dpi=400,
         figsize=(4, 4)
     )
     ax = fig.add_subplot(111)
-    ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
-    ax.plot(cnts_1D_val/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, 's', color="#4A4A4A", markersize=3, mec=None, alpha=0.25, label='Raw (validation)')
-    ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
-    ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Deadtime Fit')
+    ax.plot(cnts_1D/r_binsize_t/Nshots/1e6, r_centers_trim_cat/1e3, '.', color='#4A4A4A', markeredgewidth=0, alpha=0.35, label='Raw')
+    # ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
+    # ax.plot(cnts_1D_val/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, 's', color="#4A4A4A", markersize=3, mec=None, alpha=0.25, label='Raw (validation)')
+    # ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
+    ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Estimate')
     ax.axvline(
-        x=avg_flux/1e6,
+        x=avg_flux_10x10_mueller/1e6,
         color="#FF69B4",  # hot pink
         linestyle="--",
         linewidth=2,
         alpha=0.9,
-        label='Average Flux'
+        label='Coarse'
     )
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
     ax.set_title('Fit: Poisson Degree {}, Deadtime Degree {}'.format(degree_pois, degree_dead))
-    ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+    # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+    # ax.yaxis.set_major_locator(ticker.LinearLocator(numticks=5))
     plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
-    # ax.set_ylim([2.937, 2.939])
+    ax.set_yticks(np.array([1.2385, 1.2388, 1.2391, 1.2394, 1.2397]))
+    ax.set_ylim([1.2384, 1.2398])
     # ax.set_xlim([0, 300])
     # ax.set_xscale('log')
     plt.legend(fontsize=8)
