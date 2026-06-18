@@ -219,11 +219,9 @@ def plot_fits(
     """
     avg_flux_train = torch.mean(cnts_1D_train/r_binsize_t/Nshots)  # [Hz]
     avg_flux_val = torch.mean(cnts_1D_val/r_binsize_t/Nshots)  # [Hz]
-    avg_flux = (avg_flux_train + avg_flux_val) / 2  # [Hz]
-    avg_flux_10x10 = avg_flux * (1.2 / 10) * (0.1 / 10)  # [Hz]
-    avg_flux_10x10_mueller = avg_flux_10x10 / (1 - 31.8e-9 * avg_flux_10x10)  # [Hz]
-    print('Coarse (10 m x 10 s) flux estimate: {:.2f} kHz'.format(avg_flux_10x10_mueller/1e3))
-    # avg_flux_corrected = avg_flux / (1 - 29.5e-9 * avg_flux)  # [Hz]
+    avg_flux = 6e6  # [Hz] Hardcoded value. Correct value based on histogramming the region at 10 m x 10 sec
+    avg_flux_corrected = avg_flux / (1 - 31.8e-9 * avg_flux)  # [Hz]
+    print('Coarse estimate: {:.2f} MHz'.format(avg_flux_corrected/1e6))
 
     cnts_1D = torch.cat((cnts_1D_train, cnts_1D_val), dim=0)
     r_centers_trim_cat = torch.cat((r_centers_trim, r_centers_trim), dim=0)
@@ -239,7 +237,7 @@ def plot_fits(
     # ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
     ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Estimate')
     ax.axvline(
-        x=avg_flux_10x10_mueller/1e6,
+        x=avg_flux_corrected/1e6,
         color="#FF69B4",  # hot pink
         linestyle="--",
         linewidth=2,
