@@ -15,7 +15,7 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-process = True
+process = False
 histogram = True
 degree_start = 2
 degree_end = 8

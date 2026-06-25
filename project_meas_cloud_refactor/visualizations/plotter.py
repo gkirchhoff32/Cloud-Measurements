@@ -66,11 +66,11 @@ class DataPlotter:
 
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
-        ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+        # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
         ax.ticklabel_format(useOffset=False, style='plain', axis='x')
         # ax.ticklabel_format(useOffset=False, style='plain', axis='y')
-        plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-        plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
+        # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
+        # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
         ax.set_title(
             timestamp.strftime(
                 "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)".format("Low Gain" if low_gain else "High Gain")
@@ -78,10 +78,10 @@ class DataPlotter:
             pad=20
         ) if timestamp else ax.set_title('Simulated Backscatter', pad=20)
 
-        fig.subplots_adjust(
-            left=0.22,
-            bottom=0.2
-        )
+        # fig.subplots_adjust(
+        #     left=0.22,
+        #     bottom=0.2
+        # )
 
         print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
         if self.save_img:
@@ -140,8 +140,8 @@ class DataPlotter:
                                  cmap='viridis',
                                  # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
                                  #              vmax=flux.max()/1e6)
-                                 norm=LogNorm(2e-1,
-                                              9e2)
+                                 norm=LogNorm(5e-3,
+                                              4e0)
                                  )
             cax = inset_axes(
                 ax,
@@ -175,19 +175,19 @@ class DataPlotter:
             ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1 / self.PRF, self.c) / 1e3])
             ax.set_xlim(self.xlim) if self.plot_xlim else None
 
-            ax.set_box_aspect(1)  # makes the actual histogram panel square
+            # ax.set_box_aspect(1)  # makes the actual histogram panel square
 
             # ax.set_xlim([160, 215])
-            ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+            # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
             # fig.subplots_adjust(left=0.25, bottom=0.18, right=1, top=0.92)
             # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
             # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             # plt.tight_layout()
 
-            fig.subplots_adjust(
-                left=0.18,
-                right=0.8,
-            )
+            # fig.subplots_adjust(
+            #     left=0.18,
+            #     right=0.8,
+            # )
 
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
