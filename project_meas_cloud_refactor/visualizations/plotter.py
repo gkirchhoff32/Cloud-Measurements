@@ -106,6 +106,17 @@ class DataPlotter:
         dt = t_binedges[1] - t_binedges[0]  # [s]
         dr = r_binedges[1] - r_binedges[0]  # [m]
 
+        r_centers = (r_binedges[:-1] + r_binedges[1:]) / 2  # [m]
+
+        # Very back of the envelope background subtract. Need to make more robust.
+        bg_range = [10, 10.2]  # [km]
+        bg_min_idx = np.argmin(abs(r_binedges - bg_range[0] * 1e3))
+        bg_max_idx = np.argmin(abs(r_binedges - bg_range[1] * 1e3))
+        bg_flux = np.mean(flux[bg_min_idx:bg_max_idx, :], axis=0)  # [Hz] flux estimate per column
+
+        flux = flux - bg_flux  # [Hz]
+        flux_range_correct = flux * (r_centers[:, np.newaxis] ** 2)  # [Hz m^2]
+
         # Start plotting
         print('\nStarting to generate histogram plot...')
         start = time.time()
@@ -130,18 +141,17 @@ class DataPlotter:
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
                              )
-            # gs = GridSpec(1, 20, figure=fig)
-            # ax = fig.add_subplot(gs[0, :14])
-            # cax = fig.add_subplot(gs[0, 16:17])
             ax = fig.add_subplot(111)
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
                                  flux/1e6,
                                  cmap='viridis',
-                                 # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
-                                 #              vmax=flux.max()/1e6)
-                                 norm=LogNorm(5e-3,
-                                              4e0)
+                                 norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
+                                              vmax=flux.max()/1e6)
+                                 # norm=LogNorm(1e-3,
+                                 #              2e1),
+                                 # norm=LogNorm(vmin=1e-1,
+                                 #              vmax=flux.max() / 1e6)
                                  )
             cax = inset_axes(
                 ax,
@@ -155,8 +165,7 @@ class DataPlotter:
 
             cbar = fig.colorbar(mesh, cax=cax)
             cbar.set_label('Flux [MHz]')
-            cbar = fig.colorbar(mesh, cax=cax)
-            cbar.set_label('Flux [MHz]')
+            # cbar.set_label('Flux (range corrected) [MHz m^2]')
             # ticks = [0.6, 1, 2]
             # cbar.set_ticks(ticks)
             # cbar.set_ticklabels([str(t) for t in ticks])
@@ -184,10 +193,10 @@ class DataPlotter:
             # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             # plt.tight_layout()
 
-            # fig.subplots_adjust(
-            #     left=0.18,
-            #     right=0.8,
-            # )
+            fig.subplots_adjust(
+                left=0.18,
+                right=0.8,
+            )
 
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
@@ -199,6 +208,54 @@ class DataPlotter:
                 fname = get_unique_filename(img_save_path)
                 fig.savefig(fname, dpi=self.save_dpi)
                 print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
+            plt.show()
+
+            fig = plt.figure(dpi=self.dpi,
+                             figsize=self.figsize
+                             )
+            ax = fig.add_subplot(111)
+            mesh = ax.pcolormesh(t_binedges,
+                                 r_binedges / 1e3,
+                                 flux_range_correct / 1e6,
+                                 cmap='viridis',
+                                 # norm=LogNorm(vmin=flux_range_correct[flux_range_correct > 0].min() / 1e6,
+                                 #              vmax=flux_range_correct.max() / 1e6)
+                                 # norm=LogNorm(8e4,
+                                 #              2e6),
+                                 # norm=LogNorm(vmin=7e5,
+                                 #              vmax=flux_range_correct.max() / 1e6)
+                                 vmin=7e5,
+                                 vmax=1.8e6
+                                 )
+            cax = inset_axes(
+                ax,
+                width="4%",
+                height="100%",
+                loc="lower left",
+                bbox_to_anchor=(1.04, 0, 1, 1),
+                bbox_transform=ax.transAxes,
+                borderpad=0
+            )
+
+            cbar = fig.colorbar(mesh, cax=cax)
+            cbar.set_label('Flux (range corrected) [MHz m^2]')
+            ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
+            ax.set_ylabel('Range [km]')
+            ax.set_title(
+                timestamp.strftime(
+                    "CoBaLT Backscatter\n{} %Y-%m-%d %H:%M:%S %Z (UTC%z)\n{:.2e} m x {:.2e} s".format(
+                        "Low Gain" if low_gain else "High Gain", dr, dt)
+                ),
+                pad=20
+            ) if timestamp else ax.set_title('Simulated Backscatter\n{:.2e} m x {:.2e} s'.format(dr, dt))
+            ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1 / self.PRF, self.c) / 1e3])
+            ax.set_xlim(self.xlim) if self.plot_xlim else None
+
+            fig.subplots_adjust(
+                left=0.18,
+                right=0.8,
+            )
+
             plt.show()
 
 def plot_fits(
