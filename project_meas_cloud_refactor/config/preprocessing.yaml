@@ -22,7 +22,7 @@ process_params:
   load_ylim: False  # Set TRUE to limit vertical range when generating histogram
   load_xlim: True  # Set TRUE to limit horizontal range when generating histogram
   time_delay_correct: True  # Set TRUE if user desires to automatically remove calibration period at the beginning and remove relative delay between channels. Set FALSE to observe raw data
-  range_shift_correct: True  # Set TRUE if user wants to atumoatically adjust channel path-length difference
+  range_shift_correct: True  # Set TRUE if user wants to automatically adjust channel path-length difference
   perform_corrections: True  # Set TRUE to activate flux corrections (Processing scripts)
   apply_bin_corrections: False  # Set TRUE if user desires to apply standard single-bin corrections (Mueller, instantaneous deadtime model) to histogram. Set FALSE if doing parametric fitting. 
   diff_overlap: False  # Set TRUE if calculating differential overlap 
@@ -38,10 +38,10 @@ plot_params:
   scatter: True  # Set TRUE if scatter plotting.
   save_img: True  # Set TRUE to save figure out to image directory.
 
-  tbinsize: 1   # [s] temporal bin size
-  rbinsize: 10   # [m] range bin size
-  ylim: [0.25, 2.5]  # [km] excluding last value if histogram
-  xlim: [1500, 1775]  # [s] excluding last value if histogram
+  tbinsize: 0.1   # [s] temporal bin size
+  rbinsize: 1   # [m] range bin size
+  ylim: [0.5, 0.7]  # [km] excluding last value if histogram
+  xlim: [940, 1000]  # [s] excluding last value if histogram
 
   dpi: 400          # set dpi for plotting
   save_dpi: 300    # set dpi for saved images

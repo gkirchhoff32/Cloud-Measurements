@@ -146,12 +146,14 @@ class DataPlotter:
                                  r_binedges / 1e3,
                                  flux/1e6,
                                  cmap='viridis',
-                                 norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
-                                              vmax=flux.max()/1e6)
-                                 # norm=LogNorm(1e-3,
-                                 #              2e1),
+                                 # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
+                                 #              vmax=flux.max()/1e6)
+                                 # norm=LogNorm(1e0,
+                                 #              1e3),
                                  # norm=LogNorm(vmin=1e-1,
-                                 #              vmax=flux.max() / 1e6)
+                                 #              vmax=flux.max() / 1e6),
+                                 vmin=1e0,
+                                 vmax=2e2
                                  )
             cax = inset_axes(
                 ax,
@@ -210,22 +212,32 @@ class DataPlotter:
                 print('Finished saving plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             plt.show()
 
+            plot_flux_range_correct = flux_range_correct
+
+            vmin = 9e5
+            vmax = 2e6
+
+            # plot_flux = np.nan_to_num(plot_flux, nan=vmin)
+            plot_flux_range_correct = plot_flux_range_correct.copy()
+            plot_flux_range_correct[plot_flux_range_correct <= 0] = vmin * 1e6
+
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
                              )
             ax = fig.add_subplot(111)
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
-                                 flux_range_correct / 1e6,
+                                 plot_flux_range_correct / 1e6,
+                                 # flux_range_correct / 1e6,
                                  cmap='viridis',
                                  # norm=LogNorm(vmin=flux_range_correct[flux_range_correct > 0].min() / 1e6,
                                  #              vmax=flux_range_correct.max() / 1e6)
-                                 # norm=LogNorm(8e4,
-                                 #              2.5e6),
+                                 # norm=LogNorm(vmin,
+                                 #              vmax),
                                  # norm=LogNorm(vmin=7e5,
                                  #              vmax=flux_range_correct.max() / 1e6)
-                                 vmin=7e5,
-                                 vmax=2.5e6
+                                 vmin=vmin,
+                                 vmax=vmax
                                  )
             cax = inset_axes(
                 ax,
