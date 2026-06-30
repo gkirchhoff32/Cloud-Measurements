@@ -15,9 +15,10 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
+scatter = False
 process = False
 histogram = True
-histogram_dead_correct = False  # set true to use Mueller-corrected flux
+histogram_dead_correct = True  # set true to use Mueller-corrected flux
 degree_start = 2
 degree_end = 8
 
@@ -49,7 +50,8 @@ def run():
         ranges, shots_time = ncl.load_chunks(preprocess_path, generic_fname)
 
     dpl = DataPlotter(config)
-    dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
+    if scatter:
+        dpl.plot_time_tag_scatter(ranges, shots_time, timestamp, low_gain, generic_fname)
 
     if histogram:
         gh = GenerateHistogram(config)

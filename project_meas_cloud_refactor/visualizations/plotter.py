@@ -221,11 +221,11 @@ class DataPlotter:
                                  # norm=LogNorm(vmin=flux_range_correct[flux_range_correct > 0].min() / 1e6,
                                  #              vmax=flux_range_correct.max() / 1e6)
                                  # norm=LogNorm(8e4,
-                                 #              2e6),
+                                 #              2.5e6),
                                  # norm=LogNorm(vmin=7e5,
                                  #              vmax=flux_range_correct.max() / 1e6)
                                  vmin=7e5,
-                                 vmax=1.8e6
+                                 vmax=2.5e6
                                  )
             cax = inset_axes(
                 ax,
