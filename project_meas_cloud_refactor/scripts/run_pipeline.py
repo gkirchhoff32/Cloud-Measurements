@@ -15,9 +15,9 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-scatter = False
+scatter = True
 process = False
-histogram = True
+histogram = False
 histogram_dead_correct = True  # set true to use Mueller-corrected flux
 degree_start = 2
 degree_end = 8
@@ -60,6 +60,8 @@ def run():
         if histogram_dead_correct:
             deadtime = gh.deadtime_lg if low_gain else gh.deadtime_hg  # [s]
             flux = flux / (1 - flux * deadtime)  # [Hz]
+
+            # flux *= (10 ** (0.3 - 0.1))  # [Hz] Adjust to OD0.3 and OD0.1 difference
 
         dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
 

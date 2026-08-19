@@ -43,6 +43,23 @@ class DataPlotter:
         self.data_dir = config['file_params']['data_dir_win'] if os.name == 'nt' else config['file_params']['data_dir_lin']
 
     def plot_time_tag_scatter(self, ranges, shots_time, timestamp, low_gain, generic_fname):
+        marker_sizes = self.dot_size
+
+        range_correct = True
+        if range_correct:
+            # od_scale = 10 ** (0.3 - 0.1)  # 1.5849
+
+            # marker_sizes = self.dot_size * od_scale
+
+            # self.dot_size is the marker area at the reference range
+            reference_range = 250  # [m]
+            marker_sizes = marker_sizes * (ranges / reference_range) ** 2
+
+            # Prevent close-range markers from disappearing
+            marker_sizes = np.maximum(marker_sizes, 0.00025)
+        else:
+            marker_sizes = self.dot_size
+
         # Start plotting
         print('\nStarting to generate scatter plot...')
         start = time.time()
@@ -55,7 +72,7 @@ class DataPlotter:
         ax = fig.add_subplot(111)
         ax.scatter(shots_time,
                    ranges / 1e3,
-                   s=self.dot_size,
+                   s=marker_sizes,
                    alpha=self.alpha,
                    linewidths=0
                    )
@@ -109,7 +126,7 @@ class DataPlotter:
         r_centers = (r_binedges[:-1] + r_binedges[1:]) / 2  # [m]
 
         # Very back of the envelope background subtract. Need to make more robust.
-        bg_range = [10, 10.2]  # [km]
+        bg_range = [9.8, 10.2]  # [km]
         bg_min_idx = np.argmin(abs(r_binedges - bg_range[0] * 1e3))
         bg_max_idx = np.argmin(abs(r_binedges - bg_range[1] * 1e3))
         bg_flux = np.mean(flux[bg_min_idx:bg_max_idx, :], axis=0)  # [Hz] flux estimate per column
@@ -146,14 +163,14 @@ class DataPlotter:
                                  r_binedges / 1e3,
                                  flux/1e6,
                                  cmap='viridis',
-                                 # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
-                                 #              vmax=flux.max()/1e6)
+                                 norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
+                                              vmax=flux.max()/1e6)
                                  # norm=LogNorm(1e0,
                                  #              1e3),
-                                 # norm=LogNorm(vmin=1e-1,
+                                 # norm=LogNorm(vmin=1e-2,
                                  #              vmax=flux.max() / 1e6),
-                                 vmin=1e0,
-                                 vmax=2e2
+                                 # vmin=1e0,
+                                 # vmax=2e2
                                  )
             cax = inset_axes(
                 ax,
@@ -214,12 +231,11 @@ class DataPlotter:
 
             plot_flux_range_correct = flux_range_correct
 
-            vmin = 9e5
-            vmax = 2e6
+            vmin = 2e6
+            vmax = 7.5e6
 
-            # plot_flux = np.nan_to_num(plot_flux, nan=vmin)
-            plot_flux_range_correct = plot_flux_range_correct.copy()
-            plot_flux_range_correct[plot_flux_range_correct <= 0] = vmin * 1e6
+            # plot_flux_range_correct = plot_flux_range_correct.copy()
+            # plot_flux_range_correct[plot_flux_range_correct <= 0] = vmin * 1e6
 
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
@@ -234,7 +250,7 @@ class DataPlotter:
                                  #              vmax=flux_range_correct.max() / 1e6)
                                  # norm=LogNorm(vmin,
                                  #              vmax),
-                                 # norm=LogNorm(vmin=7e5,
+                                 # norm=LogNorm(vmin=1e4,
                                  #              vmax=flux_range_correct.max() / 1e6)
                                  vmin=vmin,
                                  vmax=vmax

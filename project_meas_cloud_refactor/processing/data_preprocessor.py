@@ -80,6 +80,10 @@ class DataPreprocessor:
             last_sync = -1  # Track the last shot time per chunk
             buffer = pd.DataFrame()  # store leftover rows across chunks
             read_path = self.data_dir + self.date + self.fname
+
+            # Remove final line in filepath. Needed if measurement was interrupted partway through acquisition.
+            self.remove_incomplete_final_row(read_path, expected_columns=7)
+
             for chunk in pd.read_csv(read_path, delimiter=',', chunksize=self.chunksize,
                                      dtype=int, on_bad_lines='skip', encoding_errors='ignore'):
                 """
@@ -173,3 +177,56 @@ class DataPreprocessor:
                   'Total time elapsed: {:.1f} seconds'.format(time.time() - start))
 
         return self.preprocess_path, self.generic_fname, low_gain, timestamp
+
+    @staticmethod
+    def remove_incomplete_final_row(file_path, expected_columns=7):
+        """
+        Remove the final row in place if it does not contain the expected
+        number of comma-separated columns.
+
+        Usually executed when the measurment is stopped partway though acquisition.
+        Final line in .ARSENL file is corrupt, so just remove it.
+        """
+        with open(file_path, "r+b") as file:
+            file_end = file.seek(0, os.SEEK_END)
+
+            if file_end == 0:
+                return False
+
+            position = file_end
+
+            # Skip any newline characters already at the end of the file.
+            while position > 0:
+                position -= 1
+                file.seek(position)
+
+                if file.read(1) not in (b"\n", b"\r"):
+                    break
+
+            line_end = position + 1
+
+            # Locate the beginning of the final row.
+            while position > 0:
+                position -= 1
+                file.seek(position)
+
+                if file.read(1) in (b"\n", b"\r"):
+                    line_start = position + 1
+                    break
+            else:
+                line_start = 0
+
+            file.seek(line_start)
+            final_row = file.read(line_end - line_start)
+
+            column_count = final_row.count(b",") + 1
+
+            if column_count != expected_columns:
+                print(
+                    f"Incomplete final row found "
+                    f"({column_count}/{expected_columns} columns). Removing it..."
+                )
+                file.truncate(line_start)
+                return True
+
+        return False
