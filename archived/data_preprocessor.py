@@ -57,8 +57,8 @@ class DataPreprocessor:
         self.time_delay_correct = config['process_params']['time_delay_correct']
         self.range_shift_correct = config['process_params']['range_shift_correct']
         self.range_shift = config['process_params']['range_shift']
-        self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
-        self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
+        # self.mueller = config['process_params']['mueller']  # TRUE value applies Mueller Correction
+        # self.estimate_deadtime = config['process_params']['estimate_deadtime']  # TRUE value estimates and uses empirical deadtime
 
         # Plot params
         self.chunksize = 50_000_000  # reasonable value to produce ~700 MB size .nc files
@@ -66,7 +66,7 @@ class DataPreprocessor:
         self.plot_ylim = config['plot_params']['plot_ylim']  # TRUE value limits range only when plotting
         self.tbinsize = config['plot_params']['tbinsize']  # [s] temporal bin size
         self.rbinsize = config['plot_params']['rbinsize']  # [m] range bin size
-        self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
+        # self.bg_edges = config['plot_params']['bg_edges']  # [m] range background window
         self.dpi = config['plot_params']['dpi']  # dots-per-inch
         self.figsize = config['plot_params']['figsize']  # figure size in inches
         self.ylim = config['plot_params']['ylim']  # [km] y-axis limits
@@ -75,10 +75,10 @@ class DataPreprocessor:
         self.save_img = config['plot_params']['save_img']  # Save images if TRUE
         self.save_dpi = config['plot_params']['save_dpi']  # DPI for saved images
         self.dot_size = config['plot_params']['dot_size']  # Dot size for 'axes.scatter' 's' param
-        self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background
+        # self.flux_correct = config['plot_params']['flux_correct']  # TRUE will plot flux that has been background
         # subtracted and range corrected
-        self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
-        self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
+        # self.chunk_start = config['plot_params']['chunk_start']  # Chunk to start plotting from
+        # self.chunk_num = config['plot_params']['chunk_num']  # Number of chunks to plot. If exceeds remaining chunks,
         # then it will plot the available ones
 
 
