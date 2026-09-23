@@ -15,10 +15,10 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-scatter = True
-process = False
-histogram = False
-histogram_dead_correct = True  # set true to use Mueller-corrected flux
+scatter = False
+process = True
+histogram = True
+histogram_dead_correct = False  # set true to use Mueller-corrected flux
 degree_start = 2
 degree_end = 8
 

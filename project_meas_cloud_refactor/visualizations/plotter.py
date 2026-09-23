@@ -163,8 +163,8 @@ class DataPlotter:
                                  r_binedges / 1e3,
                                  flux/1e6,
                                  cmap='viridis',
-                                 norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
-                                              vmax=flux.max()/1e6)
+                                 # norm=LogNorm(vmin=flux[flux > 0].min()/1e6,
+                                 #              vmax=flux.max()/1e6)
                                  # norm=LogNorm(1e0,
                                  #              1e3),
                                  # norm=LogNorm(vmin=1e-2,
@@ -319,8 +319,8 @@ def plot_fits(
     ax.plot(cnts_1D/r_binsize_t/Nshots/1e6, r_centers_trim_cat/1e3, '.', color='#4A4A4A', markeredgewidth=0, alpha=0.35, label='Raw')
     # ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
     # ax.plot(cnts_1D_val/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, 's', color="#4A4A4A", markersize=3, mec=None, alpha=0.25, label='Raw (validation)')
-    # ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Poisson Fit')
-    ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Estimate')
+    ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Estimate: Poisson')
+    ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Estimate: deadtime-aware')
     ax.axvline(
         x=avg_flux_corrected/1e6,
         color="#FF69B4",  # hot pink
