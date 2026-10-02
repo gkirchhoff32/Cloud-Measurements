@@ -45,14 +45,14 @@ class DataPlotter:
     def plot_time_tag_scatter(self, ranges, shots_time, timestamp, low_gain, generic_fname):
         marker_sizes = self.dot_size
 
-        range_correct = True
+        range_correct = False
         if range_correct:
             # od_scale = 10 ** (0.3 - 0.1)  # 1.5849
 
             # marker_sizes = self.dot_size * od_scale
 
             # self.dot_size is the marker area at the reference range
-            reference_range = 250  # [m]
+            reference_range = 200  # [m]
             marker_sizes = marker_sizes * (ranges / reference_range) ** 2
 
             # Prevent close-range markers from disappearing
@@ -167,23 +167,23 @@ class DataPlotter:
                                  #              vmax=flux.max()/1e6)
                                  # norm=LogNorm(1e0,
                                  #              1e3),
-                                 # norm=LogNorm(vmin=1e-2,
-                                 #              vmax=flux.max() / 1e6),
+                                 norm=LogNorm(vmin=1e-2,
+                                              vmax=flux.max() / 1e6),
                                  # vmin=1e0,
                                  # vmax=2e2
                                  )
-            cax = inset_axes(
-                ax,
-                width="4%",
-                height="100%",
-                loc="lower left",
-                bbox_to_anchor=(1.04, 0, 1, 1),
-                bbox_transform=ax.transAxes,
-                borderpad=0
-            )
+            # cax = inset_axes(
+            #     ax,
+            #     width="4%",
+            #     height="100%",
+            #     loc="lower left",
+            #     bbox_to_anchor=(1.04, 0, 1, 1),
+            #     bbox_transform=ax.transAxes,
+            #     borderpad=0
+            # )
 
-            cbar = fig.colorbar(mesh, cax=cax)
-            cbar.set_label('Flux [MHz]')
+            # cbar = fig.colorbar(mesh, cax=cax)
+            # cbar.set_label('Flux [MHz]')
             # cbar.set_label('Flux (range corrected) [MHz m^2]')
             # ticks = [0.6, 1, 2]
             # cbar.set_ticks(ticks)
@@ -212,10 +212,10 @@ class DataPlotter:
             # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             # plt.tight_layout()
 
-            fig.subplots_adjust(
-                left=0.18,
-                right=0.8,
-            )
+            # fig.subplots_adjust(
+            #     left=0.18,
+            #     right=0.8,
+            # )
 
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
