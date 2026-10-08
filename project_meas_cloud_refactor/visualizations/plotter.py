@@ -125,12 +125,13 @@ class DataPlotter:
 
         r_centers = (r_binedges[:-1] + r_binedges[1:]) / 2  # [m]
 
-        # Very back of the envelope background subtract. Need to make more robust.
-        bg_range = [9.8, 10.2]  # [km]
-        bg_min_idx = np.argmin(abs(r_binedges - bg_range[0] * 1e3))
-        bg_max_idx = np.argmin(abs(r_binedges - bg_range[1] * 1e3))
-        bg_flux = np.mean(flux[bg_min_idx:bg_max_idx, :], axis=0)  # [Hz] flux estimate per column
+        # # Very back of the envelope background subtract. Need to make more robust.
+        # bg_range = [9.8, 10.2]  # [km]
+        # bg_min_idx = np.argmin(abs(r_binedges - bg_range[0] * 1e3))
+        # bg_max_idx = np.argmin(abs(r_binedges - bg_range[1] * 1e3))
+        # bg_flux = np.mean(flux[bg_min_idx:bg_max_idx, :], axis=0)  # [Hz] flux estimate per column
 
+        bg_flux = 3700  # [Hz] temporary placeholder
         flux = flux - bg_flux  # [Hz]
         flux_range_correct = flux * (r_centers[:, np.newaxis] ** 2)  # [Hz m^2]
 
@@ -140,18 +141,25 @@ class DataPlotter:
 
         # plot line graph if histogram is 1D. Heatmap if 2D.
         if flux.shape[1] == 1:
+            flux_mueller = flux / (1 - flux * 29.5e-9)  # [Hz]
+
             r_centers = r_binedges[:-1] + dr / 2
 
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
                              )
             ax = fig.add_subplot(111)
-            ax.plot(flux/1e6, r_centers/1e3, 'o')
+            ax.plot(flux/1e6, r_centers/1e3, '-', label='Raw')
+            ax.plot(flux_mueller/1e6, r_centers/1e3, '-', label='Mueller')
             ax.set_xlabel('Flux [MHz]')
             ax.set_ylabel('Range [km]')
-            ax.set_title('Flux Histogram')
+            ax.set_title('Flux Profile')
+            ax.set_ylim(self.ylim) if self.plot_ylim else ax.set_ylim([0, time_to_range(1 / self.PRF, self.c) / 1e3])
+            # ax.set_xlim(2e-1, 6e1)
             # ax.set_ylim([1.8, 1.82])
             # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+            ax.set_xscale('log')
+            ax.legend()
             plt.tight_layout()
             plt.show()
         else:
@@ -167,23 +175,23 @@ class DataPlotter:
                                  #              vmax=flux.max()/1e6)
                                  # norm=LogNorm(1e0,
                                  #              1e3),
-                                 norm=LogNorm(vmin=1e-2,
+                                 norm=LogNorm(vmin=1e-1,
                                               vmax=flux.max() / 1e6),
                                  # vmin=1e0,
                                  # vmax=2e2
                                  )
-            # cax = inset_axes(
-            #     ax,
-            #     width="4%",
-            #     height="100%",
-            #     loc="lower left",
-            #     bbox_to_anchor=(1.04, 0, 1, 1),
-            #     bbox_transform=ax.transAxes,
-            #     borderpad=0
-            # )
+            cax = inset_axes(
+                ax,
+                width="4%",
+                height="100%",
+                loc="lower left",
+                bbox_to_anchor=(1.04, 0, 1, 1),
+                bbox_transform=ax.transAxes,
+                borderpad=0
+            )
 
-            # cbar = fig.colorbar(mesh, cax=cax)
-            # cbar.set_label('Flux [MHz]')
+            cbar = fig.colorbar(mesh, cax=cax)
+            cbar.set_label('Flux [MHz]')
             # cbar.set_label('Flux (range corrected) [MHz m^2]')
             # ticks = [0.6, 1, 2]
             # cbar.set_ticks(ticks)
@@ -212,10 +220,10 @@ class DataPlotter:
             # plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
             # plt.tight_layout()
 
-            # fig.subplots_adjust(
-            #     left=0.18,
-            #     right=0.8,
-            # )
+            fig.subplots_adjust(
+                left=0.18,
+                right=0.8,
+            )
 
             print('Finished generating plot.\nTime elapsed: {:.1f} s'.format(time.time() - start))
             if self.save_img:
@@ -286,73 +294,78 @@ class DataPlotter:
 
             plt.show()
 
-def plot_fits(
+def plot_fits_fn(
         cnts_1D_train,
         cnts_1D_val,
         r_binsize_t,
-        Nshots,
+        Nshots_train,
         r_centers_trim,
         lamb_out_pois,
         lamb_out_dead,
         degree_pois,
         degree_dead,
         loss_list_pois,
-        loss_list_dead
+        loss_list_dead,
+        plot_loss
     ):
     """
     Plot fit outputs from Optimizer routine and loss behavior during descent.
     """
-    avg_flux_train = torch.mean(cnts_1D_train/r_binsize_t/Nshots)  # [Hz]
-    avg_flux_val = torch.mean(cnts_1D_val/r_binsize_t/Nshots)  # [Hz]
-    avg_flux = 6e6  # [Hz] Hardcoded value. Correct value based on histogramming the region at 10 m x 10 sec
-    avg_flux_corrected = avg_flux / (1 - 31.8e-9 * avg_flux)  # [Hz]
-    print('Coarse estimate: {:.2f} MHz'.format(avg_flux_corrected/1e6))
+    avg_flux_train = torch.mean(cnts_1D_train/r_binsize_t/Nshots_train)  # [Hz]
+    avg_flux_val = torch.mean(cnts_1D_val/r_binsize_t/Nshots_train)  # [Hz]
+    # avg_flux = 6e6  # [Hz] Hardcoded value. Correct value based on histogramming the region at 10 m x 10 sec
+    # avg_flux_corrected = avg_flux / (1 - 31.8e-9 * avg_flux)  # [Hz]
+    # print('Coarse estimate: {:.2f} MHz'.format(avg_flux_corrected/1e6))
 
     cnts_1D = torch.cat((cnts_1D_train, cnts_1D_val), dim=0)
     r_centers_trim_cat = torch.cat((r_centers_trim, r_centers_trim), dim=0)
+    flux_1D = cnts_1D/r_binsize_t/Nshots_train
+    flux_1D_mueller = flux_1D / (1 - flux_1D * 29.5e-9)
 
     fig = plt.figure(
         dpi=400,
-        figsize=(4, 4)
+        figsize=(6, 3)
     )
     ax = fig.add_subplot(111)
-    ax.plot(cnts_1D/r_binsize_t/Nshots/1e6, r_centers_trim_cat/1e3, '.', color='#4A4A4A', markeredgewidth=0, alpha=0.35, label='Raw')
+    ax.plot(cnts_1D/r_binsize_t/Nshots_train/1e6, r_centers_trim_cat/1e3, '.', color='#4A4A4A', markeredgewidth=0, alpha=0.35, label='Raw')
+    # ax.plot(flux_1D_mueller/1e6, r_centers_trim_cat/1e3, '.', color='orange', markeredgewidth=0, alpha=0.35, label='Mueller corrected')
     # ax.plot(cnts_1D_train/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, '.', color="red", markeredgewidth=0, alpha=0.25, label='Raw (train)')
     # ax.plot(cnts_1D_val/r_binsize_t/Nshots/1e6, r_centers_trim/1e3, 's', color="#4A4A4A", markersize=3, mec=None, alpha=0.25, label='Raw (validation)')
     ax.plot(lamb_out_pois / 1e6, r_centers_trim / 1e3, '-', color="#000000", alpha=0.8, label='Estimate: Poisson')
     ax.plot(lamb_out_dead / 1e6, r_centers_trim / 1e3, '-', color="#1B4F72", alpha=0.8, label='Estimate: deadtime-aware')
-    ax.axvline(
-        x=avg_flux_corrected/1e6,
-        color="#FF69B4",  # hot pink
-        linestyle="--",
-        linewidth=2,
-        alpha=0.9,
-        label='Coarse'
-    )
+    # ax.axvline(
+    #     x=avg_flux_corrected/1e6,
+    #     color="#FF69B4",  # hot pink
+    #     linestyle="--",
+    #     linewidth=2,
+    #     alpha=0.9,
+    #     label='Coarse'
+    # )
     ax.set_xlabel('Flux [MHz]')
     ax.set_ylabel('Range [km]')
     ax.set_title('Fit: Poisson Degree {}, Deadtime Degree {}'.format(degree_pois, degree_dead))
     # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
     # ax.yaxis.set_major_locator(ticker.LinearLocator(numticks=5))
     plt.setp(ax.get_yticklabels(), rotation=45, ha='right')
-    ax.set_yticks(np.array([1.2385, 1.2388, 1.2391, 1.2394, 1.2397]))
-    ax.set_ylim([1.2384, 1.2398])
+    # ax.set_yticks(np.array([1.2385, 1.2388, 1.2391, 1.2394, 1.2397]))
+    ax.set_ylim([2, 2.07])
     # ax.set_xlim([0, 300])
     # ax.set_xscale('log')
     plt.legend(fontsize=8)
     plt.tight_layout()
     plt.show()
 
-    fig = plt.figure(dpi=400)
-    ax = fig.add_subplot(111)
-    ax.plot(range(len(loss_list_pois)), loss_list_pois, label='Poisson')
-    ax.plot(range(len(loss_list_dead)), loss_list_dead, label='Deadtime')
-    ax.set_title('Loss Values')
-    ax.set_xlabel('Epochs')
-    ax.set_ylabel('Loss')
-    plt.legend()
-    plt.tight_layout()
-    plt.show()
+    if plot_loss:
+        fig = plt.figure(dpi=400)
+        ax = fig.add_subplot(111)
+        ax.plot(range(len(loss_list_pois)), loss_list_pois, label='Poisson')
+        ax.plot(range(len(loss_list_dead)), loss_list_dead, label='Deadtime')
+        ax.set_title('Loss Values')
+        ax.set_xlabel('Epochs')
+        ax.set_ylabel('Loss')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
 
 def plot_af_histogram(t_binedges, tbinsize, r_binedges, deadtime_trim_idx, af_hist):
     """

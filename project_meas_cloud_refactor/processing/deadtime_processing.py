@@ -12,7 +12,7 @@ from pathlib import Path
 
 from physics.conversions import time_to_range, range_to_time
 from processing.optimizer import optimize
-from visualizations.plotter import plot_fits, plot_af_histogram
+from visualizations.plotter import plot_fits_fn, plot_af_histogram
 
 class DeadtimeProcessing:
     def __init__(self, config):
@@ -30,7 +30,19 @@ class DeadtimeProcessing:
         self.dpi = config['plot_params']['dpi']  # dots-per-inch
         self.figsize = config['plot_params']['figsize']  # figure size in inches
 
-    def optimize_complexity(self, t_binedges, r_binedges, cnts_train, cnts_val, low_gain, degree_start, degree_end):
+    def optimize_complexity(
+            self,
+            t_binedges,
+            r_binedges,
+            cnts_train,
+            cnts_val,
+            low_gain,
+            degree_start,
+            degree_end,
+            plot_af_hist,
+            plot_fits
+    ):
+
         (
             cnts_1D_train,
             af_hist_1D_train,
@@ -42,7 +54,8 @@ class DeadtimeProcessing:
             t_binedges,
             r_binedges,
             cnts_train,
-            low_gain
+            low_gain,
+            plot_af_hist
         )
 
         (
@@ -56,7 +69,8 @@ class DeadtimeProcessing:
             t_binedges,
             r_binedges,
             cnts_val,
-            low_gain
+            low_gain,
+            plot_af_hist
         )
 
         degrees = np.arange(degree_start, degree_end + 1)  # polynomial orders to iterate over
@@ -103,52 +117,39 @@ class DeadtimeProcessing:
 
         print('Optimal degrees: Poisson {}, Deadtime {}'.format(optimal_degree_pois, optimal_degree_dead))
 
-        # fit_output_dir = Path(r"C:\Users\gkirc\OneDrive\Documents\AMT_manuscript_plotting\data")
-        # fit_output_dir.mkdir(parents=True, exist_ok=True)
-        #
-        # fit_output_path = fit_output_dir / f"Dev_0_-_2026-04-29_22.47.10_plot_fits_inputs.nc"
-        #
-        # xr.Dataset(
-        #     data_vars={
-        #         "cnts_1D_train": ("range", np.asarray(cnts_1D_train)),
-        #         "cnts_1D_val": ("range", np.asarray(cnts_1D_val)),
-        #         "lamb_out_pois_best": ("range", np.asarray(lamb_out_pois_best)),
-        #         "lamb_out_dead_best": ("range", np.asarray(lamb_out_dead_best)),
-        #         "loss_list_pois_best": ("iter_pois", np.asarray(loss_list_pois_best)),
-        #         "loss_list_dead_best": ("iter_dead", np.asarray(loss_list_dead_best)),
-        #         "r_binsize_t": r_binsize_t,
-        #         "Nshots_train": Nshots_train,
-        #         "optimal_degree_pois": optimal_degree_pois,
-        #         "optimal_degree_dead": optimal_degree_dead,
-        #     },
-        #     coords={
-        #         "range": np.asarray(r_centers_trim),
-        #         "iter_pois": np.arange(len(loss_list_pois_best)),
-        #         "iter_dead": np.arange(len(loss_list_dead_best)),
-        #     },
-        # ).to_netcdf(fit_output_path)
-        #
-        # print(f"Saved plot_fits inputs to: {fit_output_path}")
-
-        plot_fits(
-            cnts_1D_train,
-            cnts_1D_val,
-            r_binsize_t,
-            Nshots_train,
-            r_centers_trim,
-            lamb_out_pois_best,
-            lamb_out_dead_best,
-            optimal_degree_pois,
-            optimal_degree_dead,
-            loss_list_pois_best,
-            loss_list_dead_best
-        )
+        if plot_fits:
+            plot_fits_fn(
+                cnts_1D_train,
+                cnts_1D_val,
+                r_binsize_t,
+                Nshots_train,
+                r_centers_trim,
+                lamb_out_pois_best,
+                lamb_out_dead_best,
+                optimal_degree_pois,
+                optimal_degree_dead,
+                loss_list_pois_best,
+                loss_list_dead_best,
+                plot_loss=False
+            )
 
         print('\nPoisson result average flux: {:.2e} Hz'.format(np.mean(lamb_out_pois_best)))
         print('Deadtime result average flux: {:.2e} Hz'.format(np.mean(lamb_out_dead_best)))
 
-    def condition_fitting(self, t_binedges, r_binedges, cnts, low_gain):
-        af_hist, deadtime_trim_idx = self.gen_active_fraction(t_binedges, r_binedges, cnts, low_gain)
+        return {
+            "lamb_out_pois_best": lamb_out_pois_best,
+            "lamb_out_dead_best": lamb_out_dead_best,
+            "optimal_degree_pois": optimal_degree_pois,
+            "optimal_degree_dead": optimal_degree_dead,
+            "r_centers_trim": r_centers_trim,
+            "cnts_1D_val": cnts_1D_val,
+            "cnts_1D_train": cnts_1D_train,
+            "r_binsize_t": r_binsize_t,
+            "Nshots_train": Nshots_train,
+        }
+
+    def condition_fitting(self, t_binedges, r_binedges, cnts, low_gain, plot_af_hist):
+        af_hist, deadtime_trim_idx = self.gen_active_fraction(t_binedges, r_binedges, cnts, low_gain, plot_af_hist)
         cnts_trim = cnts[deadtime_trim_idx:, :]  # Trim count histogram to match active-fraction histogram
 
         num_col = np.sum(~np.isnan(cnts_trim).all(axis=0))
@@ -156,7 +157,7 @@ class DeadtimeProcessing:
         af_hist_1D = torch.from_numpy(np.nansum(af_hist, axis=1)).float() / num_col
         r_binedges = torch.from_numpy(r_binedges).float()
 
-        rep_rate = 14.3e3  # [Hz]
+        rep_rate = 14.285e3  # [Hz]
         # t_range = t_binedges[-1] - t_binedges[0]  # [s]
         dr = np.diff(t_binedges)[0]
         Nshots = dr * num_col * rep_rate
@@ -231,7 +232,7 @@ class DeadtimeProcessing:
 
         return flux_mueller
 
-    def gen_active_fraction(self, t_binedges, r_binedges, cnts, low_gain):
+    def gen_active_fraction(self, t_binedges, r_binedges, cnts, low_gain, plot_af_hist):
         """
         Method to calculate active-fraction histogram using fractional binning.
 
@@ -258,7 +259,8 @@ class DeadtimeProcessing:
 
         print('Active fraction calculation. Elapsed time: {} s'.format(time.time() - start_time))
 
-        plot_af_histogram(t_binedges, self.tbinsize, r_binedges, deadtime_trim_idx, af_hist)
+        if plot_af_hist:
+            plot_af_histogram(t_binedges, self.tbinsize, r_binedges, deadtime_trim_idx, af_hist)
 
         return af_hist, deadtime_trim_idx
 

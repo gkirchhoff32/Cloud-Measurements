@@ -1,6 +1,9 @@
 import sys
 from pathlib import Path
 import yaml
+import numpy as np
+import matplotlib.pyplot as plt
+import time
 
 # Add the project root directory to Python path 
 project_root = Path(__file__).resolve().parent.parent
@@ -15,12 +18,17 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-scatter = True
-process = False
+scatter = False
+process = True
 histogram = True
+plot_hist = False
 histogram_dead_correct = False  # set true to use Mueller-corrected flux
-degree_start = 2
-degree_end = 8
+two_dim = True  # set true to process individual histogram profiles one time bin at a time
+degree_start = 15
+degree_end = 22
+two_dim_tbin = 1  # [s]
+plot_af_hist = False
+plot_fits = False
 
 def main():
     run()
@@ -61,20 +69,83 @@ def run():
             deadtime = gh.deadtime_lg if low_gain else gh.deadtime_hg  # [s]
             flux = flux / (1 - flux * deadtime)  # [Hz]
 
-            # flux *= (10 ** (0.3 - 0.1))  # [Hz] Adjust to OD0.3 and OD0.1 difference
-
-        dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
+        if plot_hist:
+            dpl.plot_histogram(flux, t_binedges, r_binedges, timestamp, low_gain, generic_fname)
 
         if process:
-            H_train, H_val = bootstrap(H)
+            if two_dim:
+                time_bnds = np.arange(t_binedges[0], t_binedges[-1], two_dim_tbin)
 
-            dp = DeadtimeProcessing(config)
-            # flux_bin_est, r_binedges_trim = dp.binwise_correction(flux, r_binedges, t_binedges, H, low_gain)
-            # dpl.plot_histogram(flux_bin_est, t_binedges, r_binedges_trim, timestamp, low_gain, generic_fname)
+                start = time.time()
+                lamb_dead = None
+                r_centers_trim = None
+                for i, (t_start, t_end) in enumerate(zip(time_bnds[:-1], time_bnds[1:])):
+                    i_start = np.searchsorted(t_binedges, t_start, side="left")
+                    i_end = np.searchsorted(t_binedges, t_end, side="right")
 
-            # dp.deadtime_fitting(H, r_binedges, t_binedges, low_gain)
-            dp.optimize_complexity(t_binedges, r_binedges, H_train, H_val, low_gain, degree_start, degree_end)
-            quit()
+                    H_subset = H[:, i_start:i_end-1]
+                    t_binedges_subset = t_binedges[i_start:i_end]
+                    H_train, H_val = bootstrap(H_subset)
+
+                    dp = DeadtimeProcessing(config)
+                    results =  dp.optimize_complexity(
+                        t_binedges_subset,
+                        r_binedges,
+                        H_train,
+                        H_val,
+                        low_gain,
+                        degree_start,
+                        degree_end,
+                        plot_af_hist,
+                        plot_fits
+                    )
+
+                    if i == 0:
+                        r_centers_trim = results['r_centers_trim']
+                        lamb_dead = np.zeros((len(r_centers_trim), len(time_bnds)-1))
+
+                    lamb_dead[:, i] = results['lamb_out_dead_best']
+
+                print('Total time elapsed: {:.2f} s'.format(time.time() - start))
+
+                r_binedges_trim = np.concatenate([
+                    [r_centers_trim[0] - np.diff(r_centers_trim)[0] / 2],
+                    (r_centers_trim[:-1] + r_centers_trim[1:]) / 2,
+                    [r_centers_trim[-1] + np.diff(r_centers_trim)[-1] / 2]
+                ])
+
+                fig, ax = plt.subplots(figsize=(8, 4))
+
+                pcm = ax.pcolormesh(
+                    time_bnds,
+                    r_binedges_trim/1e3,
+                    lamb_dead/1e6,
+                    shading="flat"
+                )
+
+                ax.set_xlabel("Time [s]")
+                ax.set_ylabel("Range [km]")
+                fig.colorbar(pcm, ax=ax, label="Flux [MHz]")
+
+                plt.show()
+
+                quit()
+            else:
+                H_train, H_val = bootstrap(H)
+
+                dp = DeadtimeProcessing(config)
+                results = dp.optimize_complexity(
+                    t_binedges,
+                    r_binedges,
+                    H_train,
+                    H_val,
+                    low_gain,
+                    degree_start,
+                    degree_end,
+                    plot_af_hist,
+                    plot_fits
+                )
+                quit()
 
 
 if __name__ == "__main__":
