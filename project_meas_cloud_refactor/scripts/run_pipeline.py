@@ -24,9 +24,9 @@ histogram = True
 plot_hist = False
 histogram_dead_correct = False  # set true to use Mueller-corrected flux
 two_dim = True  # set true to process individual histogram profiles one time bin at a time
-degree_start = 15
-degree_end = 22
-two_dim_tbin = 1  # [s]
+degree_start = 2
+degree_end = 2
+two_dim_tbin = 50  # [s] needs to be larger than histogram resolution set in config
 plot_af_hist = False
 plot_fits = False
 

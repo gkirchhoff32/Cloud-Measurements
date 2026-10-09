@@ -39,7 +39,7 @@ plot_params:
   save_img: False  # Set TRUE to save figure out to image directory.
 
   tbinsize: 0.0007   # [s] temporal bin size
-  rbinsize: 1   # [m] range bin size
+  rbinsize: 0.1   # [m] range bin size
   ylim: [2.0, 2.07]  # [km] excluding last value if histogram
   xlim: [0.01, 250]  # [s] excluding last value if histogram
 
