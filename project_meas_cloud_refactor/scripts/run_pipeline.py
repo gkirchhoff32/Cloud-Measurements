@@ -18,9 +18,9 @@ from simulation.gen_sim_data import GenerateSimData
 from utils.array_utils import bootstrap
 
 use_sim = False
-scatter = False
-process = True
-histogram = True
+scatter = True
+process = False
+histogram = False
 plot_hist = False
 histogram_dead_correct = False  # set true to use Mueller-corrected flux
 two_dim = True  # set true to process individual histogram profiles one time bin at a time
