@@ -146,6 +146,7 @@ class DeadtimeProcessing:
             "cnts_1D_train": cnts_1D_train,
             "r_binsize_t": r_binsize_t,
             "Nshots_train": Nshots_train,
+            "af_hist_1D_train": af_hist_1D_train
         }
 
     def condition_fitting(self, t_binedges, r_binedges, cnts, low_gain, plot_af_hist):

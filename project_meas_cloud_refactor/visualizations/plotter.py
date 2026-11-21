@@ -83,7 +83,7 @@ class DataPlotter:
 
         ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
         ax.set_ylabel('Range [km]')
-        # ax.yaxis.set_major_locator(plt.MaxNLocator(5))
+        ax.yaxis.set_major_locator(plt.MaxNLocator(5))
         ax.ticklabel_format(useOffset=False, style='plain', axis='x')
         # ax.ticklabel_format(useOffset=False, style='plain', axis='y')
         # plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
@@ -96,7 +96,7 @@ class DataPlotter:
         ) if timestamp else ax.set_title('Simulated Backscatter', pad=20)
 
         # fig.subplots_adjust(
-        #     left=0.22,
+        #     # left=0.22,
         #     bottom=0.2
         # )
 
@@ -132,6 +132,7 @@ class DataPlotter:
         # bg_flux = np.mean(flux[bg_min_idx:bg_max_idx, :], axis=0)  # [Hz] flux estimate per column
 
         bg_flux = 3700  # [Hz] temporary placeholder
+        # bg_flux = 0  # [Hz]
         flux = flux - bg_flux  # [Hz]
         flux_range_correct = flux * (r_centers[:, np.newaxis] ** 2)  # [Hz m^2]
 
@@ -239,8 +240,8 @@ class DataPlotter:
 
             plot_flux_range_correct = flux_range_correct
 
-            vmin = 2e6
-            vmax = 7.5e6
+            vmin = 1e-2
+            vmax = 2e1
 
             # plot_flux_range_correct = plot_flux_range_correct.copy()
             # plot_flux_range_correct[plot_flux_range_correct <= 0] = vmin * 1e6
@@ -251,17 +252,17 @@ class DataPlotter:
             ax = fig.add_subplot(111)
             mesh = ax.pcolormesh(t_binedges,
                                  r_binedges / 1e3,
-                                 plot_flux_range_correct / 1e6,
+                                 plot_flux_range_correct / 1e6 / 1e6,
                                  # flux_range_correct / 1e6,
                                  cmap='viridis',
-                                 # norm=LogNorm(vmin=flux_range_correct[flux_range_correct > 0].min() / 1e6,
-                                 #              vmax=flux_range_correct.max() / 1e6)
-                                 # norm=LogNorm(vmin,
-                                 #              vmax),
+                                 # norm=LogNorm(vmin=flux_range_correct[flux_range_correct > 0].min() / 1e6 / 1e6,
+                                 #              vmax=flux_range_correct.max() / 1e6 / 1e6)
+                                 norm=LogNorm(vmin,
+                                              vmax),
                                  # norm=LogNorm(vmin=1e4,
                                  #              vmax=flux_range_correct.max() / 1e6)
-                                 vmin=vmin,
-                                 vmax=vmax
+                                 # vmin=vmin,
+                                 # vmax=vmax
                                  )
             cax = inset_axes(
                 ax,
@@ -274,7 +275,7 @@ class DataPlotter:
             )
 
             cbar = fig.colorbar(mesh, cax=cax)
-            cbar.set_label('Flux (range corrected) [MHz m^2]')
+            cbar.set_label('Range-corrected Flux [MHz km^2]')
             ax.set_xlabel(timestamp.strftime("Time in seconds since %H:%M:%S %Z") if timestamp else 'Time [s]')
             ax.set_ylabel('Range [km]')
             ax.set_title(

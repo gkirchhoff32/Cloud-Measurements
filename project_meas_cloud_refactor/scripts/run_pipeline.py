@@ -26,9 +26,10 @@ histogram_dead_correct = False  # set true to use Mueller-corrected flux
 two_dim = True  # set true to process individual histogram profiles one time bin at a time
 degree_start = 2
 degree_end = 2
-two_dim_tbin = 50  # [s] needs to be larger than histogram resolution set in config
+two_dim_tbin = 50 # [s] needs to be larger than histogram resolution set in config
 plot_af_hist = False
 plot_fits = False
+# plot_direct_correction = True
 
 def main():
     run()
@@ -78,6 +79,7 @@ def run():
 
                 start = time.time()
                 lamb_dead = None
+                # lamb_corrected = None
                 r_centers_trim = None
                 for i, (t_start, t_end) in enumerate(zip(time_bnds[:-1], time_bnds[1:])):
                     i_start = np.searchsorted(t_binedges, t_start, side="left")
@@ -102,9 +104,22 @@ def run():
 
                     if i == 0:
                         r_centers_trim = results['r_centers_trim']
-                        lamb_dead = np.zeros((len(r_centers_trim), len(time_bnds)-1))
+                        shape = (len(r_centers_trim), len(time_bnds) - 1)
+                        lamb_dead = np.zeros(shape)
+                        # lamb_corrected = np.full(shape, np.nan)
 
                     lamb_dead[:, i] = results['lamb_out_dead_best']
+
+                    # # Direct deadtime correction (no denoising)
+                    # dt = results['r_binsize_t']  # [s] range bin size in seconds
+                    # lamb_obs = results['cnts_1D_train'] / (results['Nshots_train'] * dt)
+                    #
+                    # lamb_corrected[:, i] = np.divide(
+                    #     lamb_obs,
+                    #     results['af_hist_1D_train'],
+                    #     out=np.full_like(lamb_obs, np.nan, dtype=float),
+                    #     where=results['af_hist_1D_train'] > 0
+                    # )
 
                 print('Total time elapsed: {:.2f} s'.format(time.time() - start))
 
@@ -113,6 +128,36 @@ def run():
                     (r_centers_trim[:-1] + r_centers_trim[1:]) / 2,
                     [r_centers_trim[-1] + np.diff(r_centers_trim)[-1] / 2]
                 ])
+
+                # if plot_direct_correction:
+                #     from matplotlib.colors import LogNorm
+                #
+                #     fig, ax = plt.subplots(figsize=(8, 4))
+                #
+                #     # Range-corrected flux [MHz km²]
+                #     lamb_rc = lamb_corrected * (r_centers_trim.numpy()[:, None] / 1e3) ** 2
+                #
+                #     pcm = ax.pcolormesh(
+                #         time_bnds,
+                #         r_binedges_trim / 1e3,
+                #         lamb_corrected / 1e6,
+                #         # lamb_rc / 1e6,
+                #         shading="flat",
+                #         # norm=LogNorm(vmin=1e-2, vmax=2e1)
+                #     )
+                #
+                #     ax.set_xlabel("Time [s]")
+                #     ax.set_ylabel("Range [km]")
+                #     fig.colorbar(
+                #         pcm,
+                #         ax=ax,
+                #         # label="Range-Corrected Flux (Direct correction) [MHz $\mathrm{km}^2$]",
+                #         label='Flux (Direct correction) [MHz]'
+                #     )
+                #
+                #     plt.show()
+                #
+                #     quit()
 
                 fig, ax = plt.subplots(figsize=(8, 4))
 
