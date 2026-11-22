@@ -240,11 +240,11 @@ class DataPlotter:
 
             plot_flux_range_correct = flux_range_correct
 
-            vmin = 1e-2
-            vmax = 2e1
+            vmin = 7e-1
+            vmax = 1e1
 
-            # plot_flux_range_correct = plot_flux_range_correct.copy()
-            # plot_flux_range_correct[plot_flux_range_correct <= 0] = vmin * 1e6
+            plot_flux_range_correct = plot_flux_range_correct.copy()
+            plot_flux_range_correct[plot_flux_range_correct <= 0] = vmin * 1e6 * 1e6
 
             fig = plt.figure(dpi=self.dpi,
                              figsize=self.figsize
